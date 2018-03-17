@@ -1,0 +1,7 @@
+cffi==1.11.5
+numpy==1.14.2+mkl
+pycparser==2.18
+scipy==1.0.0
+six==1.11.0
+SoundFile==0.10.1
+Theano==1.0.1
