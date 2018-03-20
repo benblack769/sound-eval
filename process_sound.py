@@ -9,8 +9,10 @@ from WeightBias import WeightBias
 
 #theano.config.optimizer="fast_compile"
 
-NUM_LOOK_BACK = 10
-HIDDEN_LEN = 30
+NUM_LOOK_BACK = 20
+SLOW_TIER_SKIP = 4
+SLOW_TIER_SIZE = 35
+FAST_TIER_SIZE = 28
 BATCH_SIZE = 32
 plotutil = plot_utility.PlotHolder("basic_test")
 shared_value_saver = RememberSharedVals('basic_weights')
@@ -18,27 +20,34 @@ shared_value_saver = RememberSharedVals('basic_weights')
 def square(x):
     return x * x
 
-def get_pred_train_fns(inlen, outlen, hiddenlen, train_update_const):
+def get_pred_train_fns(inlen, outlen, train_update_const):
     inputvec = T.matrix('invec', dtype=theano.config.floatX)
     expectedvec = T.vector('expected', dtype=theano.config.floatX)
 
-    new_in_len = hiddenlen + inlen
-    hiddenfn = WeightBias("hidden",new_in_len, hiddenlen)
-    outfn = WeightBias("out",hiddenlen, outlen)
+    act_in_len = SLOW_TIER_SIZE + FAST_TIER_SIZE + inlen
+    hiddenSFS = WeightBias("hiddenSFS", act_in_len, SLOW_TIER_SIZE)
+    hiddenSFF = WeightBias("hiddenSFF", act_in_len, FAST_TIER_SIZE)
+    outfn = WeightBias("out",SLOW_TIER_SIZE + FAST_TIER_SIZE, outlen)
 
-    shared_value_saver.add_shared_vals(hiddenfn.wb_list())
+    shared_value_saver.add_shared_vals(hiddenSFS.wb_list())
+    shared_value_saver.add_shared_vals(hiddenSFF.wb_list())
     shared_value_saver.add_shared_vals(outfn.wb_list())
 
     def logistic(x):
         one = np.float32(1.0)
         return one / (one+T.exp(-x))
 
-    intermed_vec = T.zeros_like(hiddenfn.b)
+    slow_intermed = T.zeros_like(hiddenSFS.b[:SLOW_TIER_SIZE])
+    fast_intermed = T.zeros_like(hiddenSFF.b[:FAST_TIER_SIZE])
     for i in range(NUM_LOOK_BACK):
-        total_in_vec = T.concatenate([inputvec[i], intermed_vec])
-        intermed_vec = logistic(hiddenfn.calc_output(total_in_vec))
+        total_in_vec = T.concatenate([inputvec[i], slow_intermed, fast_intermed])
+        fast_intermed = logistic(hiddenSFF.calc_output(total_in_vec))
+        if i % SLOW_TIER_SKIP == SLOW_TIER_SKIP - 1:
+            slow_intermed = logistic(hiddenSFS.calc_output(total_in_vec))
 
-    out_val = logistic(outfn.calc_output(intermed_vec))
+
+    total_out_in_vec = T.concatenate([slow_intermed, fast_intermed])
+    out_val = logistic(outfn.calc_output(total_out_in_vec))
 
     actual = out_val
     diff = square(expectedvec - actual)
@@ -46,10 +55,11 @@ def get_pred_train_fns(inlen, outlen, hiddenlen, train_update_const):
     plotutil.add_plot("error",error,100)
 
     outdiff = outfn.update(error,np.float32(train_update_const))
-    hiddiff = hiddenfn.update(error,np.float32(train_update_const))
+    hiddiffSFS = hiddenSFS.update(error,np.float32(train_update_const))
+    hiddiffSFF = hiddenSFF.update(error,np.float32(train_update_const))
 
-    hidbias_plot = plotutil.add_plot("hidbias",hiddenfn.b,100)
-    outbias_plot = plotutil.add_plot("outbias",outfn.b,100)
+    #hidbias_plot = plotutil.add_plot("hidbias",hiddenfn.b,100)
+    #outbias_plot = plotutil.add_plot("outbias",outfn.b,100)
 
     predict = theano.function(
             inputs=[inputvec],
@@ -59,7 +69,7 @@ def get_pred_train_fns(inlen, outlen, hiddenlen, train_update_const):
     train = theano.function(
             inputs=[inputvec,expectedvec],
             outputs=plotutil.append_plot_outputs([]),
-            updates=hiddiff+outdiff,
+            updates=hiddiffSFS+hiddiffSFF+outdiff,
         )
     saved_train_fn = shared_value_saver.share_save_fn(train)
     plotted_train_fn = plotutil.get_plot_update_fn(saved_train_fn)
@@ -98,7 +108,7 @@ def predict_next(sig, samplerate, my_predict_fn):
 sig, samplerate = sf.read('output.wav')
 sig = sig.astype(np.float32)
 num_channels = sig.shape[1]
-pred_fn, train_fn = get_pred_train_fns(num_channels*NUM_LOOK_BACK,num_channels,HIDDEN_LEN,0.03)
+pred_fn, train_fn = get_pred_train_fns(num_channels,num_channels,0.1)
 print("compiled fn\n\n\n!!!!!")
 #train_on_data(sig, samplerate, train_fn)
 predict_next(sig, samplerate, pred_fn)
