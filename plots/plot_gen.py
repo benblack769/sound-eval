@@ -6,14 +6,16 @@ import os
 #    "plot_data/model2layer1_200tanh_layer34_1_train_test00/",
 #    "plot_data/model2layer2_400tanh_layer34_2_train_test00/"
 #]
-foldnames = ["plot_data/basic_test00000000000000/"]
+foldnames = ["plot_data/basic_test0000000000/"]
 for fold in foldnames:
     for filename in os.listdir(fold):
         td = TimeData(fold+filename)
+        if "weigh" in filename:
+            td.filter_lines(list(range(2,80,3)))
         td.average_n_steps(1000)
         bef_png_name = filename[:filename.index(".")]
         bef_fold_name = fold[10:-1]
-        td.save_plot("exp_plots/"+bef_fold_name+bef_png_name+".png")
+        td.save_plot("new_plots/"+bef_fold_name+bef_png_name+".png")
 
 '''
 fname = "plot_data/cell_time_plot/cell_state_data.tsv"
