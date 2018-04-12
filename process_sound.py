@@ -8,8 +8,8 @@ from shared_save import RememberSharedVals
 
 from WeightBias import WeightBias
 theano.config.optimizer="fast_compile"
-NUM_LOOK_BACK = 3
-plotutil = plot_utility.PlotHolder("basic_test")
+NUM_LOOK_BACK = 20
+plotutil = plot_utility.PlotHolder("basic_testa")
 shared_value_saver = RememberSharedVals('basic_weights')
 
 def square(x):
@@ -39,8 +39,9 @@ def get_pred_train_fns(inlen, outlen, hiddenlen, train_update_const):
     outdiff = outfn.update(error,np.float32(train_update_const))
     hiddiff = hiddenfn.update(error,np.float32(train_update_const))
 
-    hidbias_plot = plotutil.add_plot("hidbias",hiddenfn.b,100)
-    outbias_plot = plotutil.add_plot("outbias",outfn.b,100)
+    hidbias_plot = plotutil.add_plot("hidbias",hiddenfn.b,1000)
+    outbias_plot = plotutil.add_plot("outbias",outfn.b,1000)
+    outbias_plot = plotutil.add_plot("error",error,100)
 
     predict = theano.function(
             inputs=[inputvec],
@@ -84,5 +85,5 @@ sig, samplerate = sf.read('output.wav')
 sig = sig.astype(np.float32)
 num_channels = sig.shape[1]
 pred_fn, train_fn = get_pred_train_fns(num_channels*NUM_LOOK_BACK,num_channels,30,0.1)
-#train_on_data(sig, samplerate, train_fn)
-predict(sig, samplerate, pred_fn)
+train_on_data(sig, samplerate, train_fn)
+#predict(sig, samplerate, pred_fn)
