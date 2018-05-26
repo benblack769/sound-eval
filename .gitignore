@@ -4,3 +4,4 @@ __pycache__
 plots
 saved_weights
 libsndfile-1.0.28
+fma_metadata

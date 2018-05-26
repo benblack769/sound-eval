@@ -6,7 +6,8 @@ set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 
 SET (BASE_SRC
-        ${CPP_SOURCE_DIR}/file-to-wav.cpp)
+        ${CPP_SOURCE_DIR}/file-to-wav.cpp
+        ${CPP_SOURCE_DIR}/train-predict.cpp)
 
 
 
