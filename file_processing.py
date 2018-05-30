@@ -13,7 +13,7 @@ def mp3_to_raw_data(filename, samplerate):
     # converts mp3 to wav using system ffmpeg
 
     if not shutil.which('ffmpeg'):
-        raise runtime_error('''
+        raise RuntimeError('''
         You need to install the command line tool `ffmpeg` to run this.
         On Ubuntu, this can be installed with `sudo apt-get install ffmpeg`
         ''')
@@ -35,7 +35,7 @@ def mp3_to_raw_data(filename, samplerate):
     print(samplerate)
     assert out_samplerate == samplerate
     sig_float = sig.astype(np.float32)
-    sig_vec = sig_float.sum(axis=1) / sig_float.shape[1]
+    sig_vec = sig_float.sum(axis=1) / sig_float.shape[1] if len(sig_float.shape) > 1 else sig_float 
     return sig_vec
 
 #print(mp3_to_raw_data('../fma_small/000/000002.mp3',16000)[5000:5010])

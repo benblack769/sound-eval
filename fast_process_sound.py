@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Input, Conv1D, Lambda, Concatenate, Reshape
@@ -8,16 +11,17 @@ import tensorflow as tf
 #import theano
 
 from file_processing import mp3_to_raw_data, raw_data_to_wav
+from process_fma_files import get_raw_data
 
 SAMPLERATE = 16000
 
-BLOCK_SIZE = 512
+BLOCK_SIZE = 20000
 
 def seq_model():
     model = Sequential()
     model.add(Dense(20, input_dim=BLOCK_SIZE))
     model.add(Activation('relu'))
-    model.add(Dense(1))
+    model.add(Dense(BLOCK_SIZE))
     model.add(Activation('tanh'))
 
     model.compile(optimizer='rmsprop',
@@ -84,10 +88,10 @@ model = wavenet_model()
 #sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 #print(sess)
 #print("Session\n\n\n\n")
-
-raw_data1 = mp3_to_raw_data('../fma_small/000/000002.mp3',SAMPLERATE)
-raw_data2 = mp3_to_raw_data('output.wav',SAMPLERATE)
-raw_data = np.concatenate((raw_data1,raw_data2))
+    #raw_data2 = mp3_to_raw_data('output.wav',SAMPLERATE)
+    #raw_data = np.concatenate((raw_data1,raw_data2))
+raw_data = get_raw_data(SAMPLERATE)
+print(raw_data.shape)
 
 def blockify_data(r_data):
     batched_data = []
@@ -110,14 +114,15 @@ pred_data = np.roll(batched_data,shift=1,axis=1)
 #print(batched_data.shape)
 #exit(1)
 
-for _ in range(50):
+for _ in range(10):
     model.fit(batched_data, pred_data, batch_size=32)
 model.save_weights('arg.h5')
 
 model.load_weights('arg.h5')
 pred_data = model.predict(batched_data,batch_size=32)
 out_raw = deblockify_data(pred_data)
-raw_data_to_wav('out.wav',out_raw,SAMPLERATE)
+raw_data_to_wav('sing_channel.wav',raw_data,SAMPLERATE)
+raw_data_to_wav('processed.wav',out_raw,SAMPLERATE)
 
 #model.save_weights('my_model_weights.h5')
 
