@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import io
 
-def mp3_to_raw_data(filename, samplerate=16000):
+def mp3_to_raw_data(filename, samplerate):
     '''
     parameters: - filename of mp3 file
                 - samplerate of returned value
@@ -29,9 +29,16 @@ def mp3_to_raw_data(filename, samplerate=16000):
     print(" ".join(ffmpeg_args))
     raw_wav_data = subprocess.check_output(ffmpeg_args)
 
-    sig, samplerate = sf.read(io.BytesIO(raw_wav_data))
+    sig, out_samplerate = sf.read(io.BytesIO(raw_wav_data))
+    print("sample rates!!!")
+    print(out_samplerate)
+    print(samplerate)
+    assert out_samplerate == samplerate
     sig_float = sig.astype(np.float32)
     sig_vec = sig_float.sum(axis=1) / sig_float.shape[1]
     return sig_vec
 
 #print(mp3_to_raw_data('../fma_small/000/000002.mp3',16000)[5000:5010])
+
+def raw_data_to_wav(filename,data,samplerate):
+    sf.write(filename,data,samplerate)
