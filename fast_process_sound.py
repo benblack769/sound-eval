@@ -75,7 +75,7 @@ def wavenet_model():
     #di4 = dialate_layer(di2,4)
     model = Model(inputs=input, outputs=l2_f)
     model.compile(optimizer='Adam',
-              loss='mean_squared_error',
+              loss='mean_absolute_error',
               metrics=['accuracy'])
     return model
 
