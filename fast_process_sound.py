@@ -55,8 +55,6 @@ def wavenet_model():
     input = Input(shape=(BLOCK_SIZE,))
     di1 = dialate_layer(input,1)
     di1 = dialate_layer(di1,1)
-    di1 = dialate_layer(di1,1)
-    di1 = dialate_layer(di1,1)
     di2 = dialate_layer(di1,2)
     di4 = dialate_layer(di2,4)
     di8 = dialate_layer(di4,8)
