@@ -17,7 +17,9 @@ SAMPLERATE = 16000
 
 BLOCK_SIZE = 1000
 
-LAYER_WIDTH = 4
+LAYER_WIDTH = 16
+
+NUM_MUSIC_FOLDERS = 5
 
 def seq_model():
     model = Sequential()
@@ -67,13 +69,30 @@ def wavenet_model():
     final_res4,out4 = dialate_layer(out3,4)
     final_res5,out5 = dialate_layer(out4,8)
     final_res6,out6 = dialate_layer(out5,16)
+    final_res7,out7 = dialate_layer(out6,1)
+    final_res8,out8 = dialate_layer(out7,2)
+    final_res9,out9 = dialate_layer(out8,4)
+    final_res10,out10 = dialate_layer(out9,8)
+    final_res11,out11 = dialate_layer(out10,16)
+    final_res12,out12 = dialate_layer(out11,32)
+    final_res13,out13 = dialate_layer(out12,64)
+    final_res14,out14 = dialate_layer(out13,64)
+    final_res15,out15 = dialate_layer(out14,128)
     final_result_concat = keras.layers.Concatenate(axis=2)([
         final_res1,
         final_res2,
         final_res3,
         final_res4,
         final_res5,
-        final_res6
+        final_res6,
+        final_res7,
+        final_res8,
+        final_res9,
+        final_res10,
+        final_res12,
+        final_res13,
+        final_res14,
+        final_res15
     ])
     final_value = keras.layers.TimeDistributed(Dense(1))(final_result_concat)
     final_value_shape = Reshape((BLOCK_SIZE,))(final_value)
@@ -98,7 +117,7 @@ model = wavenet_model()
 #print("Session\n\n\n\n")
     #raw_data2 = mp3_to_raw_data('output.wav',SAMPLERATE)
     #raw_data = np.concatenate((raw_data1,raw_data2))
-raw_data = get_raw_data(SAMPLERATE)
+raw_data = get_raw_data(SAMPLERATE,NUM_MUSIC_FOLDERS)
 print(raw_data.shape)
 
 def blockify_data(r_data):
@@ -123,14 +142,19 @@ pred_data = np.roll(batched_data,shift=1,axis=1)
 #exit(1)
 
 #for _ in range(10):
-model.fit(batched_data, pred_data, batch_size=32, epochs=10)
+model.fit(batched_data, pred_data, batch_size=32, epochs=20)
 model.save_weights('arg.h5')
 
 model.load_weights('arg.h5')
 pred_data = model.predict(batched_data,batch_size=32)
 out_raw = deblockify_data(pred_data)
-raw_data_to_wav('sing_channel.wav',raw_data,SAMPLERATE)
-raw_data_to_wav('processed.wav',out_raw,SAMPLERATE)
+
+def prune_output_10m(total_output):
+    ten_min_samples = 60*10*SAMPLERATE
+    return total_output[:ten_min_samples] if len(total_output) > ten_min_samples else total_output
+
+raw_data_to_wav('sing_channel.wav',prune_output_10m(raw_data),SAMPLERATE)
+raw_data_to_wav('processed.wav',prune_output_10m(out_raw),SAMPLERATE)
 
 #model.save_weights('my_model_weights.h5')
 
