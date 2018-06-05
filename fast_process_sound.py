@@ -15,7 +15,9 @@ from process_fma_files import get_raw_data
 
 SAMPLERATE = 16000
 
-BLOCK_SIZE = 20000
+BLOCK_SIZE = 1000
+
+LAYER_WIDTH = 4
 
 def seq_model():
     model = Sequential()
@@ -32,46 +34,54 @@ def seq_model():
 
 def shift_x(shift_ammount):
     def shift_x_fn(x):
-        val = tf.manip.roll(x,shift=shift_ammount,axis=1)
+        # the 0 axis here is the batch axis, so the 1 axis
+        # is the 0 axis to kerasa
+        tensorflow_0_axis = 1
+        val = tf.manip.roll(x,shift=shift_ammount,axis=tensorflow_0_axis)
         return val
     return shift_x_fn
 
 def dist_dense(flat_vec):
-    in_mat = Reshape((BLOCK_SIZE,1))(flat_vec)
     time_mat = keras.layers.TimeDistributed(Dense(1))(in_mat)
-    return  Reshape((BLOCK_SIZE,))(time_mat)
+    return  time_mat
 
-def dialate_layer(input, dialate_length):
-    rolled_layer = Lambda(shift_x(BLOCK_SIZE-dialate_length))(input)
-    concat_input = keras.layers.Concatenate()([Reshape((BLOCK_SIZE,1))(input),Reshape((BLOCK_SIZE,1))(rolled_layer)])
-    mat_input = Reshape((BLOCK_SIZE,2))(concat_input)
-    dialte_out = keras.layers.TimeDistributed(Dense(1,use_bias=True))(mat_input)
-    arg = Reshape((BLOCK_SIZE,))(dialte_out)
-    return arg#Activation('relu')(arg)
+def dialate_layer(input, dialate_length, input_size=LAYER_WIDTH, output_size=LAYER_WIDTH):
+    rolled_layer = Lambda(shift_x(-dialate_length))(input)
+    concat_input = keras.layers.Concatenate(axis=2)([input,rolled_layer])
+    mat_input = concat_input
+    sigmoid_linear_part = keras.layers.TimeDistributed(Dense(LAYER_WIDTH))(mat_input)
+    tanh_linear_part = keras.layers.TimeDistributed(Dense(LAYER_WIDTH))(mat_input)
+    l1_m = keras.layers.Multiply()([Activation('sigmoid')(sigmoid_linear_part),Activation('tanh')(tanh_linear_part)])
+    #l1_f = dist_dense(l1_m)
+    l1_r = keras.layers.Add()([l1_m,input]) if input_size == output_size else l1_m
+    return l1_m,l1_r#Activation('relu')(arg)
 
 #def dilated_layer(x):
 
 def wavenet_model():
     input = Input(shape=(BLOCK_SIZE,))
-    di1 = dialate_layer(input,1)
-    di1 = dialate_layer(di1,1)
-    di2 = dialate_layer(di1,2)
-    di4 = dialate_layer(di2,4)
-    di8 = dialate_layer(di4,8)
-    l1_m = keras.layers.Multiply()([Activation('sigmoid')(di8),Activation('tanh')(di8)])
-    l1_f = dist_dense(l1_m)
-    l1_r = keras.layers.Add()([l1_f,input])
-    di1 = dialate_layer(l1_r,1)
-    di2 = dialate_layer(di1,2)
-    di4 = dialate_layer(di2,4)
-    di8 = dialate_layer(di4,8)
-    l2_m = keras.layers.Multiply()([Activation('sigmoid')(di8),Activation('tanh')(di8)])
-    l2_f = dist_dense(l2_m)
+    shape_input = Reshape((BLOCK_SIZE,1))(input)
+    final_res1,out1 = dialate_layer(shape_input,1,1,LAYER_WIDTH)
+    final_res2,out2 = dialate_layer(out1,1)
+    final_res3,out3 = dialate_layer(out2,2)
+    final_res4,out4 = dialate_layer(out3,4)
+    final_res5,out5 = dialate_layer(out4,8)
+    final_res6,out6 = dialate_layer(out5,16)
+    final_result_concat = keras.layers.Concatenate(axis=2)([
+        final_res1,
+        final_res2,
+        final_res3,
+        final_res4,
+        final_res5,
+        final_res6
+    ])
+    final_value = keras.layers.TimeDistributed(Dense(1))(final_result_concat)
+    final_value_shape = Reshape((BLOCK_SIZE,))(final_value)
     #l1_r = keras.layers.Add()([l2_f,input])
     #di1 = dialate_layer(l2_r,1)
     #di2 = dialate_layer(di1,2)
     #di4 = dialate_layer(di2,4)
-    model = Model(inputs=input, outputs=l2_f)
+    model = Model(inputs=input, outputs=final_value_shape)
     model.compile(optimizer='Adam',
               loss='mean_absolute_error',
               metrics=['accuracy'])
@@ -112,8 +122,8 @@ pred_data = np.roll(batched_data,shift=1,axis=1)
 #print(batched_data.shape)
 #exit(1)
 
-for _ in range(10):
-    model.fit(batched_data, pred_data, batch_size=32)
+#for _ in range(10):
+model.fit(batched_data, pred_data, batch_size=32, epochs=10)
 model.save_weights('arg.h5')
 
 model.load_weights('arg.h5')
