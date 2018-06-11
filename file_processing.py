@@ -3,6 +3,7 @@ import numpy as np
 import shutil
 import subprocess
 import io
+import tempfile
 
 def mp3_to_raw_data(filename, samplerate):
     '''
@@ -35,10 +36,14 @@ def mp3_to_raw_data(filename, samplerate):
     print(samplerate)
     assert out_samplerate == samplerate
     sig_float = sig.astype(np.float32)
-    sig_vec = sig_float.sum(axis=1) / sig_float.shape[1] if len(sig_float.shape) > 1 else sig_float 
+    sig_vec = sig_float.sum(axis=1) / sig_float.shape[1] if len(sig_float.shape) > 1 else sig_float
     return sig_vec
 
 #print(mp3_to_raw_data('../fma_small/000/000002.mp3',16000)[5000:5010])
 
 def raw_data_to_wav(filename,data,samplerate):
     sf.write(filename,data,samplerate)
+
+#def raw_data_to_mp3(filename,data,samplerate):
+#    wav_file = tempfile.NamedTemporaryFile()
+#    sf.write(wav_file.name,data,samplerate)
