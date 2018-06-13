@@ -1,6 +1,6 @@
 import os
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+#os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+#os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Input, Conv1D, Lambda, Concatenate, Reshape
@@ -12,19 +12,23 @@ import random
 import tensorflow as tf
 
 from file_processing import mp3_to_raw_data, raw_data_to_wav
-from process_fma_files import get_raw_data
+import process_fma_files
 
 SAMPLERATE = 10000
 
-BLOCK_SIZE = 2000
+BLOCK_SIZE = 1000
+SECTION_SIZE = BLOCK_SIZE
 
-LAYER_WIDTH = 4
-
-OUTPUT_SIZE = 16
+LAYER_WIDTH = 32
+HIDDEN_SIZE = 48
 
 NUM_MUSIC_FOLDERS = 1
 
-SONG_SAMPLES = 5 # number of samples from same song
+BATCH_SIZE = 16
+
+SONG_SAMPLES = 3 # number of samples from same song
+
+TRAINING_SAMPLES = 1000
 
 def shift_x(shift_ammount):
     def shift_x_fn(x):
@@ -35,20 +39,25 @@ def shift_x(shift_ammount):
         return val
     return shift_x_fn
 
+
+def int_shape(x):
+    return list(map(int, x.get_shape()))
+
+def d_to_int(x):
+    return int(str(x)) if x and str(x) != "?" else None
+
 def select_second_last_elmt(tensor):
     return tensor[:,:,-1]
 
 def select_second_last_elmt_shape(input_shape):
-    return tuple(input_shape[0:2] + [input_shape[3]])
+    return (d_to_int(input_shape[0]), d_to_int(input_shape[1]), d_to_int(input_shape[3]))
 
 def dialate_layer(input, dialate_length, input_size=LAYER_WIDTH, output_size=LAYER_WIDTH):
     rolled_layer = Lambda(shift_x(-dialate_length))(input)
-    concat_input = keras.layers.Concatenate(axis=2)([input,rolled_layer])
+    concat_input = keras.layers.Concatenate(axis=3)([input,rolled_layer])
     mat_input = concat_input
-    sigmoid_linear_part = keras.layers.TimeDistributed(Dense(LAYER_WIDTH),input_shape=(input_size))(mat_input)
-    tanh_linear_part = keras.layers.TimeDistributed(Dense(LAYER_WIDTH),input_shape=(input_size))(mat_input)
-    print("\n\n",sigmoid_linear_part.shape,"\n\n")
-    print("\n\n",mat_input.shape,"\n\n")
+    sigmoid_linear_part = keras.layers.TimeDistributed(Dense(output_size),input_shape=(input_size,))(mat_input)
+    tanh_linear_part = keras.layers.TimeDistributed(Dense(output_size),input_shape=(input_size,))(mat_input)
     l1_m = keras.layers.Multiply()([Activation('sigmoid')(sigmoid_linear_part),Activation('tanh')(tanh_linear_part)])
     #l1_f = dist_dense(l1_m)
     l1_r = keras.layers.Add()([l1_m,input]) if input_size == output_size else l1_m
@@ -75,29 +84,47 @@ def wavenet_model():
     final_res_l2,out3 = incr_pow2(out2,8)
     #final_res_l3,out4 = incr_pow2(out3,9)
     #final_res_l4,out5 = incr_pow2(out4,9)
-    final_result_concat = keras.layers.Concatenate(axis=3)(
+    final_result_concat = keras.layers.Add()( #keras.layers.Concatenate(axis=3)(
         [final_res1]
         + final_res_l1
         + final_res_l2
         #+ final_res_l3
         #+ final_res_l4
     )
-    first_elmt_in_concat = Lambda(select_second_last_elmt,output_shape=select_second_last_elmt_shape(final_result_concat.shape))(final_result_concat)
-    print(first_elmt_in_concat.shape)
+    last_elmt_in_concat = Lambda(select_second_last_elmt,output_shape=select_second_last_elmt_shape(final_result_concat.shape))(final_result_concat)
+    #print(last_elmt_in_concat.shape)
 
-    final_value = Dense(1)(first_elmt_in_concat)
-    final_value_shape = Reshape((BLOCK_SIZE,))(final_value)
+    def sum_all_but_last(lst_emt):
+        #print("lstsmmd")
+        #print(lst_emt.shape)
+        sum_same_song = tf.reduce_sum(lst_emt[:,:SONG_SAMPLES],axis=1)
+        comparitor = lst_emt[:,SONG_SAMPLES]
+        #print(comparitor.shape)
+        #print(sum_same_song.shape)
+        concatted = tf.concat([sum_same_song,comparitor],axis=1)
+        #print(concatted.shape)
+        return concatted
+
+    summed_last = Lambda(sum_all_but_last,output_shape=(None,2*d_to_int(last_elmt_in_concat.shape[2])))(last_elmt_in_concat)
+    #flattened_last = Reshape((d_to_int(last_elmt_in_concat.shape[1])*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
+
+    # linear evaluation might actually work better
+    hidden_value = summed_last#Dense(HIDDEN_SIZE, activation='relu')(summed_last)
+
+    final_value = Dense(1,activation='tanh')(hidden_value)
+
     #l1_r = keras.layers.Add()([l2_f,input])
     #di1 = dialate_layer(l2_r,1)
     #di2 = dialate_layer(di1,2)
     #di4 = dialate_layer(di2,4)
-    model = Model(inputs=input, outputs=final_value_shape)
+    model = Model(inputs=input, outputs=final_value)
     model.compile(optimizer='Adam',
               loss='mean_squared_error',
               metrics=['accuracy'])
     return model
 
-model = wavenet_model()
+#model = wavenet_model()
+#exit(1)
 
 #plot_model(model, to_file='model.png')
 #exit(1)
@@ -108,63 +135,50 @@ model = wavenet_model()
 #print("Session\n\n\n\n")
     #raw_data2 = mp3_to_raw_data('output.wav',SAMPLERATE)
     #raw_data = np.concatenate((raw_data1,raw_data2))
-raw_data = get_raw_data(SAMPLERATE,NUM_MUSIC_FOLDERS)
-print(raw_data.shape)
-
-def blockify_data(r_data):
-    batched_data = []
-    for i in range(0,r_data.shape[0]-BLOCK_SIZE,BLOCK_SIZE//2):
-        batched_data.append(raw_data[i:i+BLOCK_SIZE])
-
-    #labels = raw_data[BLOCK_SIZE:BLOCK_SIZE+len(batched_data)]
-    batched_data = np.stack(batched_data)
-    return batched_data
-
-def deblockify_data(b_data):
-    raw_blocks = b_data[:,:BLOCK_SIZE//2]
-    return raw_blocks.flatten()
 
 
-batched_data = blockify_data(raw_data)
-pred_data = np.roll(batched_data,shift=1,axis=1)
-#print(pred_data[30][0:20])
-#print(batched_data[30][00:20])
-#print(batched_data.shape)
-#exit(1)
 
-#for _ in range(10):
 
-model.fit(batched_data, pred_data,
-    batch_size=32,
-    epochs=20)
-
-model.save_weights('arg.h5')
-
-model.load_weights('arg.h5')
-pred_data = model.predict(batched_data,batch_size=32)
-out_raw = deblockify_data(pred_data)
-
-SECTION_SIZE = 1000
 
 class Trainer:
     def __init__(self, model):
         self.model = model
+        self.batch_labels = []
+        self.batch_input = []
 
     def train_item(self, same_song_section_list, compare_song_section, is_frome_same_song):
         # trains item
-        input = np.stack(same_song_section_list+[compare_song_section])
-        print(input.shape)
-        label = np.float32(is_frome_same_song)
-
-        model.fit(input, label,
+        batch_ready_input, batch_ready_label = self.format_train_items(same_song_section_list, compare_song_section, is_frome_same_song)
+        self.model.fit(batch_ready_input, batch_ready_label,
             batch_size=1,
             epochs=1,
             )
 
-    def batch_train_item(self,same_song_section_list,different_song_section):
+    def format_train_items(self,same_song_section_list, compare_song_section, is_frome_same_song):
+        input = np.stack(same_song_section_list+[compare_song_section])
+        batch_ready_input = np.reshape(input,(1,)+input.shape)
+        label = np.float32(is_frome_same_song)
+        batch_ready_label = np.reshape(label,(1,1,1))
+        return batch_ready_input,batch_ready_label
+
+    def batch_train_item(self,same_song_section_list,compare_song_section,is_frome_same_song):
         # puts items on queue for later batched training
         # if queue reaches certain size, then execute the batch and train
-        pass
+        batch_ready_input, batch_ready_label = self.format_train_items(same_song_section_list, compare_song_section, is_frome_same_song)
+        self.batch_labels.append(batch_ready_label)
+        self.batch_input.append(batch_ready_input)
+
+        assert len(self.batch_labels) == len(self.batch_input)
+        if len(self.batch_labels) >= BATCH_SIZE*5:
+            batched_input = np.concatenate(self.batch_input)
+            batched_labels = np.concatenate(self.batch_labels)
+            self.model.fit(batched_input, batched_labels,
+                batch_size=BATCH_SIZE,
+                epochs=1,
+                )
+            self.batch_labels = []
+            self.batch_input = []
+
 
     def eval_section(self, section):
         # evaluates and returns rep vector of section
@@ -181,6 +195,12 @@ class SectionGenerator:
     def random_song_id(self):
         return random.randrange(0,len(self.song_list))
 
+    def random_song_other_than(self, other_song_id):
+        s_id = random.randrange(0,len(self.song_list))
+        while s_id != other_song_id:
+            s_id = random.randrange(0,len(self.song_list))
+        return s_id
+
     def get_sections_in_song(self, song_id, num_sections):
         song_size = len(self.song_list[song_id])
         #max_sections_in_song = len(self.song_list[song_id]) / SECTION_SIZE
@@ -188,32 +208,59 @@ class SectionGenerator:
         MAX_NUM_TRIES = 200
         for i in range(MAX_NUM_TRIES):
             section_split = np.random.randint(low=0,high=song_size-SECTION_SIZE-1,size=num_sections)
-            did_overlap = self.section_split_not_overlapping(section_split)
+            did_overlap = self.section_split_overlapping(section_split)
             if not did_overlap:
                 return [self.song_section(song_id,start) for start in section_split]
             elif i == MAX_NUM_TRIES-1:
                 assert False, "tried to split song into too many sections. \nPerhaps a very short song in is the list?"
+
+    def get_section_in_song(self, song_id):
+        return self.get_sections_in_song(song_id,1)[0]
 
     def song_section(self, song_id, start_loc):
         song = self.song_list[song_id]
         assert len(song) >= start_loc+SECTION_SIZE
         return song[start_loc:start_loc+SECTION_SIZE]
 
-    def section_split_not_overlapping(self, section_split):
+    def section_split_overlapping(self, section_split):
         sorted_splits = np.sort(section_split)
         sorted_split_ends = sorted_splits + SECTION_SIZE
         did_overlap = sorted_split_ends[1:] < sorted_splits[:-1]
         return did_overlap.any()
 
 
-
-
 def prune_output_10m(total_output):
     ten_min_samples = 60*10*SAMPLERATE
     return total_output[:ten_min_samples] if len(total_output) > ten_min_samples else total_output
 
-raw_data_to_wav('sing_channel.wav',prune_output_10m(raw_data),SAMPLERATE)
-raw_data_to_wav('processed.wav',prune_output_10m(out_raw),SAMPLERATE)
+def train_full(model,music_list):
+    sec_gen = SectionGenerator(music_list)
+    trainer = Trainer(model)
+    is_same_value = 1.0
+    is_not_same_value = -1.0
+    for _ in range(TRAINING_SAMPLES):
+        song_id = sec_gen.random_song_id()
+        # trains with samples from same song
+        song_samples = sec_gen.get_sections_in_song(song_id,SONG_SAMPLES+1)
+        trainer.batch_train_item(song_samples[:SONG_SAMPLES],song_samples[SONG_SAMPLES],is_same_value)
+
+        # trains with samples from different songs
+        other_song_id = sec_gen.random_song_other_than(song_id)
+        new_song_samples = sec_gen.get_sections_in_song(song_id,SONG_SAMPLES)
+        other_song_sample = sec_gen.get_section_in_song(song_id)
+        trainer.batch_train_item(new_song_samples,other_song_sample,is_not_same_value)
+
+
+def full_run():
+    model = wavenet_model()
+    music_paths,music_list = process_fma_files.get_raw_data_list(SAMPLERATE,NUM_MUSIC_FOLDERS)
+    train_full(model,music_list)
+    model.save_weights('../identify_weights.h5')
+
+full_run()
+
+#raw_data_to_wav('sing_channel.wav',prune_output_10m(raw_data),SAMPLERATE)
+#raw_data_to_wav('processed.wav',prune_output_10m(out_raw),SAMPLERATE)
 
 #model.save_weights('my_model_weights.h5')
 
