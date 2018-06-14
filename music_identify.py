@@ -1,6 +1,6 @@
 import os
-#os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
-#os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Input, Conv1D, Lambda, Concatenate, Reshape
@@ -19,12 +19,14 @@ SAMPLERATE = 10000
 BLOCK_SIZE = 1000
 SECTION_SIZE = BLOCK_SIZE
 
-LAYER_WIDTH = 32
+LAYER_WIDTH = 16
 HIDDEN_SIZE = 48
 
-NUM_SONGS = 20
+NUM_SONGS = 5000
 
 BATCH_SIZE = 4
+
+NUM_BATCHES_PER_KERAS = 500
 
 SONG_SAMPLES = 1 # number of samples from same song
 
@@ -47,7 +49,9 @@ def d_to_int(x):
     return int(str(x)) if x and str(x) != "?" else None
 
 def select_second_last_elmt(tensor):
-    return tensor[:,:,-1]
+    tshape =  tensor[:,:,-1]
+    print(tshape.shape)
+    return tshape
 
 def select_second_last_elmt_shape(input_shape):
     return (d_to_int(input_shape[0]), d_to_int(input_shape[1]), d_to_int(input_shape[3]))
@@ -85,13 +89,14 @@ def wavenet_model():
     final_res1,out1 = dialate_layer(shape_input,1,1,LAYER_WIDTH)
     final_res_l1,out2 = incr_pow2(out1,7)
     final_res_l2,out3 = incr_pow2(out2,8)
+    final_res_l3,out4 = incr_pow2(out3,8)
     #final_res_l3,out4 = incr_pow2(out3,9)
     #final_res_l4,out5 = incr_pow2(out4,9)
     final_result_concat = keras.layers.Add()( #keras.layers.Concatenate(axis=3)(
         [final_res1]
         + final_res_l1
         + final_res_l2
-        #+ final_res_l3
+        + final_res_l3
         #+ final_res_l4
     )
     last_elmt_in_concat = Lambda(select_second_last_elmt,output_shape=select_second_last_elmt_shape(final_result_concat.shape))(final_result_concat)
@@ -114,7 +119,7 @@ def wavenet_model():
     # linear evaluation might actually work better
     hidden_value = summed_last#Dense(HIDDEN_SIZE, activation='relu')(summed_last)
 
-    final_value = Dense(1,activation='tanh')(hidden_value)
+    final_value = Dense(1,activation='sigmoid')(hidden_value)
 
     #l1_r = keras.layers.Add()([l2_f,input])
     #di1 = dialate_layer(l2_r,1)
@@ -124,7 +129,7 @@ def wavenet_model():
     #concat_output = keras.layers.Concatenate()([final_value,flattened_last_element])
     model = Model(inputs=input, outputs=final_value)
     model.compile(optimizer='Adam',
-              loss=keras.losses.mean_squared_error,
+              loss=keras.losses.binary_crossentropy,
               metrics=['accuracy'])
     return model
 
@@ -176,12 +181,13 @@ class Trainer:
         self.batch_input.append(batch_ready_input)
 
         assert len(self.batch_labels) == len(self.batch_input)
-        if len(self.batch_labels) >= BATCH_SIZE*10:
+        if len(self.batch_labels) >= BATCH_SIZE*NUM_BATCHES_PER_KERAS:
             batched_input = np.concatenate(self.batch_input)
             batched_labels = np.concatenate(self.batch_labels)
             self.model.fit(batched_input, batched_labels,
                 batch_size=BATCH_SIZE,
                 epochs=1,
+                shuffle=False,
                 )
             self.batch_labels = []
             self.batch_input = []
@@ -244,7 +250,7 @@ def train_full(model,music_list):
     sec_gen = SectionGenerator(music_list)
     trainer = Trainer(model)
     is_same_value = 1.0
-    is_not_same_value = -1.0
+    is_not_same_value = 0.0
     for _ in range(TRAINING_SAMPLES):
         song_id = sec_gen.random_song_id()
         # trains with samples from same song

@@ -28,12 +28,19 @@ def mp3_to_raw_data(filename, samplerate):
         "pipe:1"    # puts output in stdout, allowing check_output to get the data
     ]
     print(" ".join(ffmpeg_args))
-    raw_wav_data = subprocess.check_output(ffmpeg_args)
+
+    try:
+        raw_wav_data = subprocess.check_output(ffmpeg_args)
+    except subprocess.CalledProcessError:
+        with open("log/failed_file_loads.txt",'a') as logfile:
+            logfile.write("process error on {} with sample rate {}\n".format(file_path,sample_rate))
+        return None
+
 
     sig, out_samplerate = sf.read(io.BytesIO(raw_wav_data))
-    print("sample rates!!!")
-    print(out_samplerate)
-    print(samplerate)
+    #print("sample rates!!!")
+    #print(out_samplerate)
+    #print(samplerate)
     assert out_samplerate == samplerate
     sig_float = sig.astype(np.float32)
     sig_vec = sig_float.sum(axis=1) / sig_float.shape[1] if len(sig_float.shape) > 1 else sig_float
