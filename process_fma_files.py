@@ -20,7 +20,7 @@ def mp3_caller(path_rate_pair):
 
 def process_files_parallel(full_base_paths,sample_rate):
     paths_with_rate = [(path,sample_rate) for path in full_base_paths]
-    with concurrent.futures.ThreadPoolExecutor() as pool:
+    with concurrent.futures.ProcessPoolExecutor() as pool:#try exchanginhg with ThreadPoolExecutor for additional speed
         return pool.map(mp3_caller,paths_with_rate)
 
 def process_files_sequential(full_base_paths,sample_rate):

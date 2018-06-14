@@ -33,7 +33,7 @@ def mp3_to_raw_data(filename, samplerate):
         raw_wav_data = subprocess.check_output(ffmpeg_args)
     except subprocess.CalledProcessError:
         with open("log/failed_file_loads.txt",'a') as logfile:
-            logfile.write("process error on {} with sample rate {}\n".format(file_path,sample_rate))
+            logfile.write("process error on {} with sample rate {}\n".format(filename,samplerate))
         return None
 
 
