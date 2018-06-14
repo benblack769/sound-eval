@@ -22,13 +22,13 @@ SECTION_SIZE = BLOCK_SIZE
 LAYER_WIDTH = 32
 HIDDEN_SIZE = 48
 
-NUM_MUSIC_FOLDERS = 1
+NUM_SONGS = 20
 
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 
-SONG_SAMPLES = 3 # number of samples from same song
+SONG_SAMPLES = 1 # number of samples from same song
 
-TRAINING_SAMPLES = 1000
+TRAINING_SAMPLES = 2000000
 
 def shift_x(shift_ammount):
     def shift_x_fn(x):
@@ -75,6 +75,9 @@ def incr_pow2(input, highest_pow2):
         final_list.append(final_res2)
     return final_list, cur_input
 
+def mse_only_on_label(y_true,y_pred):
+    return keras.backend.square(y_pred[0] - y_true[0])
+
 def wavenet_model():
     NUM_INPUTS = SONG_SAMPLES + 1
     input = Input(shape=(NUM_INPUTS,BLOCK_SIZE))
@@ -105,7 +108,7 @@ def wavenet_model():
         #print(concatted.shape)
         return concatted
 
-    summed_last = Lambda(sum_all_but_last,output_shape=(None,2*d_to_int(last_elmt_in_concat.shape[2])))(last_elmt_in_concat)
+    summed_last = Lambda(sum_all_but_last,output_shape=(2*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
     #flattened_last = Reshape((d_to_int(last_elmt_in_concat.shape[1])*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
 
     # linear evaluation might actually work better
@@ -117,9 +120,11 @@ def wavenet_model():
     #di1 = dialate_layer(l2_r,1)
     #di2 = dialate_layer(di1,2)
     #di4 = dialate_layer(di2,4)
+    #flattened_last_element = Reshape(((SONG_SAMPLES+1)*LAYER_WIDTH,))(last_elmt_in_concat)
+    #concat_output = keras.layers.Concatenate()([final_value,flattened_last_element])
     model = Model(inputs=input, outputs=final_value)
     model.compile(optimizer='Adam',
-              loss='mean_squared_error',
+              loss=keras.losses.mean_squared_error,
               metrics=['accuracy'])
     return model
 
@@ -158,8 +163,10 @@ class Trainer:
         input = np.stack(same_song_section_list+[compare_song_section])
         batch_ready_input = np.reshape(input,(1,)+input.shape)
         label = np.float32(is_frome_same_song)
-        batch_ready_label = np.reshape(label,(1,1,1))
-        return batch_ready_input,batch_ready_label
+        reshaped_label = np.reshape(label,(1,1))
+        #padded_label = np.zeros((1,(SONG_SAMPLES+1)*LAYER_WIDTH))
+        #batch_ready_label = np.concatenate([reshaped_label,padded_label],axis=1)
+        return batch_ready_input,reshaped_label
 
     def batch_train_item(self,same_song_section_list,compare_song_section,is_frome_same_song):
         # puts items on queue for later batched training
@@ -169,7 +176,7 @@ class Trainer:
         self.batch_input.append(batch_ready_input)
 
         assert len(self.batch_labels) == len(self.batch_input)
-        if len(self.batch_labels) >= BATCH_SIZE*5:
+        if len(self.batch_labels) >= BATCH_SIZE*10:
             batched_input = np.concatenate(self.batch_input)
             batched_labels = np.concatenate(self.batch_labels)
             self.model.fit(batched_input, batched_labels,
@@ -197,7 +204,7 @@ class SectionGenerator:
 
     def random_song_other_than(self, other_song_id):
         s_id = random.randrange(0,len(self.song_list))
-        while s_id != other_song_id:
+        while s_id == other_song_id:
             s_id = random.randrange(0,len(self.song_list))
         return s_id
 
@@ -247,13 +254,15 @@ def train_full(model,music_list):
         # trains with samples from different songs
         other_song_id = sec_gen.random_song_other_than(song_id)
         new_song_samples = sec_gen.get_sections_in_song(song_id,SONG_SAMPLES)
-        other_song_sample = sec_gen.get_section_in_song(song_id)
+        other_song_sample = sec_gen.get_section_in_song(other_song_id)
         trainer.batch_train_item(new_song_samples,other_song_sample,is_not_same_value)
 
+def output_all_weights(model, music_list, path_list):
+    pass
 
 def full_run():
     model = wavenet_model()
-    music_paths,music_list = process_fma_files.get_raw_data_list(SAMPLERATE,NUM_MUSIC_FOLDERS)
+    music_paths,music_list = process_fma_files.get_raw_data_list(SAMPLERATE,NUM_SONGS)
     train_full(model,music_list)
     model.save_weights('../identify_weights.h5')
 
