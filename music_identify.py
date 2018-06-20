@@ -20,9 +20,9 @@ BLOCK_SIZE = 1000
 SECTION_SIZE = BLOCK_SIZE
 
 LAYER_WIDTH = 16
-HIDDEN_SIZE = 48
+#HIDDEN_SIZE = 48
 
-NUM_SONGS = 5000
+NUM_SONGS = 50
 
 BATCH_SIZE = 4
 
@@ -113,11 +113,11 @@ def wavenet_model():
         #print(concatted.shape)
         return concatted
 
-    summed_last = Lambda(sum_all_but_last,output_shape=(2*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
-    #flattened_last = Reshape((d_to_int(last_elmt_in_concat.shape[1])*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
+    #summed_last = Lambda(sum_all_but_last,output_shape=(2*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
+    flattened_last = Reshape((d_to_int(last_elmt_in_concat.shape[1])*d_to_int(last_elmt_in_concat.shape[2]),))(last_elmt_in_concat)
 
     # linear evaluation might actually work better
-    hidden_value = summed_last#Dense(HIDDEN_SIZE, activation='relu')(summed_last)
+    hidden_value = flattened_last#Dense(HIDDEN_SIZE, activation='relu')(summed_last)
 
     final_value = Dense(1,activation='sigmoid')(hidden_value)
 
@@ -197,6 +197,7 @@ class Trainer:
         # evaluates and returns rep vector of section
         pass
 
+
 class SectionGenerator:
     '''
     Gets a list of single-channel song numpy vectors
@@ -214,33 +215,22 @@ class SectionGenerator:
             s_id = random.randrange(0,len(self.song_list))
         return s_id
 
-    def get_sections_in_song(self, song_id, num_sections):
+    def get_sequential_sections_in_song(self, song_id, num_sections):
         song_size = len(self.song_list[song_id])
         #max_sections_in_song = len(self.song_list[song_id]) / SECTION_SIZE
         #assert num_sections < max_sections_in_song
-        MAX_NUM_TRIES = 200
-        for i in range(MAX_NUM_TRIES):
-            section_split = np.random.randint(low=0,high=song_size-SECTION_SIZE-1,size=num_sections)
-            did_overlap = self.section_split_overlapping(section_split)
-            if not did_overlap:
-                return [self.song_section(song_id,start) for start in section_split]
-            elif i == MAX_NUM_TRIES-1:
-                assert False, "tried to split song into too many sections. \nPerhaps a very short song in is the list?"
+        get_block_size = num_sections * SECTION_SIZE
+        assert song_size > get_block_size
+        section_start = random.randint(0,song_size-get_block_size)
+        return [self.song_section(song_id, start*SECTION_SIZE + section_start) for start in range(0, num_sections)]
 
     def get_section_in_song(self, song_id):
-        return self.get_sections_in_song(song_id,1)[0]
+        return self.get_sequential_sections_in_song(song_id,1)[0]
 
     def song_section(self, song_id, start_loc):
         song = self.song_list[song_id]
         assert len(song) >= start_loc+SECTION_SIZE
         return song[start_loc:start_loc+SECTION_SIZE]
-
-    def section_split_overlapping(self, section_split):
-        sorted_splits = np.sort(section_split)
-        sorted_split_ends = sorted_splits + SECTION_SIZE
-        did_overlap = sorted_split_ends[1:] < sorted_splits[:-1]
-        return did_overlap.any()
-
 
 def prune_output_10m(total_output):
     ten_min_samples = 60*10*SAMPLERATE
@@ -254,14 +244,15 @@ def train_full(model,music_list):
     for _ in range(TRAINING_SAMPLES):
         song_id = sec_gen.random_song_id()
         # trains with samples from same song
-        song_samples = sec_gen.get_sections_in_song(song_id,SONG_SAMPLES+1)
+        song_samples = sec_gen.get_sequential_sections_in_song(song_id,SONG_SAMPLES+1)
         trainer.batch_train_item(song_samples[:SONG_SAMPLES],song_samples[SONG_SAMPLES],is_same_value)
 
         # trains with samples from different songs
         other_song_id = sec_gen.random_song_other_than(song_id)
-        new_song_samples = sec_gen.get_sections_in_song(song_id,SONG_SAMPLES)
+        assert other_song_id != song_id
+        #new_song_samples = sec_gen.get_sequential_sections_in_song(song_id,SONG_SAMPLES)
         other_song_sample = sec_gen.get_section_in_song(other_song_id)
-        trainer.batch_train_item(new_song_samples,other_song_sample,is_not_same_value)
+        trainer.batch_train_item(song_samples[:SONG_SAMPLES],other_song_sample,is_not_same_value)
 
 def output_all_weights(model, music_list, path_list):
     pass
