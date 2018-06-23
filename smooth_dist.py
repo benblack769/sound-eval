@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plot
+from WeightBias import DenseLayer
 
-#import tensorflow as tf
+import tensorflow as tf
 #from pixnn import discretized_mix_logistic_loss
 
-DATA_SIZE = 1000
+DATA_SIZE = 100000
 TEST_SIZE = 200
 
 NUM_BUCKETS = 50
@@ -53,12 +54,83 @@ def wavelength_distribution_songs():
 
 #numbers_form = np.sum(numbers_to_vectors(norm_data),axis=0)
 #plot_vector(numbers_form)
-wavelength_distribution_songs()
+#wavelength_distribution_songs()
+
+def get_dist_train_pred_fns(inputs,targets):
+    HIDDEN_SIZE_1 = 50
+    HIDDEN_SIZE_2 = 120
+    HIDDEN_SIZE_3 = 80
+    ADAM_learning_rate = 0.001
+
+
+    in_to_hid = DenseLayer("in_to_hid",1,HIDDEN_SIZE_1)
+    hid1_to_hid2 = DenseLayer("hid1_to_hid2",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
+    hid2_to_hid3 = DenseLayer("hid2_to_hid3",HIDDEN_SIZE_2,HIDDEN_SIZE_3)
+    hid_to_out = DenseLayer("hid_to_out",HIDDEN_SIZE_3,NUM_BUCKETS)
+
+    hid_layer_1 = tf.nn.relu(in_to_hid.calc_output(inputs))
+    hid_layer_2 = tf.nn.relu(hid1_to_hid2.calc_output(hid_layer_1))
+    hid_layer_3 = tf.nn.relu(hid2_to_hid3.calc_output(hid_layer_2))
+    out_layer = tf.sigmoid(hid_to_out.calc_output(hid_layer_3))
+
+    final_cost = tf.nn.softmax_cross_entropy_with_logits_v2(
+        labels = targets,
+        logits = out_layer,
+    )
+
+    prediction = tf.nn.softmax(out_layer)
+
+    optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
+
+    train_op = optimizer.minimize(final_cost)
+    return prediction,train_op
+
+def randomly_pull_ammount(nparr,batch_size):
+    indicies = np.random.choice(len(nparr), batch_size)
+    return np.stack(nparr[idx] for idx in indicies)
+
+def run_training(sess,train_op,inputs,targets):
+    BATCH_SIZE = 32
+
+    train_input = np.reshape(norm_data,(len(norm_data),1))
+    train_expected = numbers_to_vectors(train_input)
+    randomly_pull_ammount(train_input,BATCH_SIZE)
+
+    for epoc in range(5):
+        for x in range(0,len(train_input)-BATCH_SIZE,BATCH_SIZE):
+            sess.run(train_op,feed_dict={
+                inputs: randomly_pull_ammount(train_input,BATCH_SIZE),
+                targets: randomly_pull_ammount(train_expected,BATCH_SIZE),
+            })
+
+def run_test(sess,pred_op,inputs,targets):
+    test_input = np.reshape(test_data,(len(test_data),1))
+    test_expected = numbers_to_vectors(test_input)
+    sample = 5
+    result = sess.run(pred_op,feed_dict={
+        inputs: test_input[sample:sample+5],
+        targets: test_expected[sample:sample+5],
+    })
+    print(result)
+
+
+
+
+def run_all():
+    inputs = tf.placeholder(tf.float32, shape=(None, 1))
+    targets = tf.placeholder(tf.float32, shape=(None, NUM_BUCKETS))
+
+    pred_op,train_op = get_dist_train_pred_fns(inputs,targets)
+
+    init = tf.global_variables_initializer()
+
+    with tf.Session() as sess:
+        sess.run(init)
+        print("initted",flush=True)
+        run_training(sess,train_op,inputs,targets)
+        print("training finished",flush=True)
+        run_test(sess,pred_op,inputs,targets)
+
+run_all()
+
 exit(0)
-inputs = tf.placeholder(tf.float32, shape=(None, 1))
-
-targets = tf.placeholder(tf.int32, shape=(None, NUM_BUCKETS))
-
-with tf.Session() as sess:
-    print("a=2, b=3")
-    print("Addition with constants: %i" % sess.run(a+b))
