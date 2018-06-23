@@ -13,7 +13,7 @@ def get_all_music_paths():
     return mp3_list
 
 def get_raw_data(sample_rate, num_files=20):
-    return np.concatenate(get_raw_data_list(sample_rate,num_folders)[1])
+    return np.concatenate(get_raw_data_list(sample_rate,num_files)[1])
 
 def mp3_caller(path_rate_pair):
     return mp3_to_raw_data(path_rate_pair[0],path_rate_pair[1])

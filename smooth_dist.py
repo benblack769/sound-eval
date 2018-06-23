@@ -29,29 +29,31 @@ def bucket_to_number(bucket_index):
     return (bucket_index / NUM_BUCKETS) * BUCKET_RANGE + BUCKET_START
 
 def plot_numbers(numbers):
-    plot.hist(numbers, density=1, bins=20)
-    #plot.axis([50, 110, 0, 0.06])
-    #axis([xmin,xmax,ymin,ymax])
+    plot.hist(numbers, density=1, bins=50)
     plot.xlabel('Weight')
     plot.ylabel('Probability')
     plot.show()
 
 def plot_vector(vector):
     ind = (np.arange(0, NUM_BUCKETS))
-    print((vector))
-    #print(ind, vector)
-    plot.bar(ind,vector)
+    plot.bar(ind,vector,width=0.5)
     plot.show()
-
-
 
 def numbers_to_vectors(numbers):
     return np.stack(bucket_to_vector(number_to_bucket(num)) for num in numbers)
 
+def wavelength_distribution_songs():
+    import process_fma_files
+    all_data = process_fma_files.get_raw_data(50000)
+    data_selection = np.random.choice(all_data,size=10000,replace=False)
+    bucket_vals = np.sum(numbers_to_vectors(data_selection),axis=0)
+    #plot_vector(bucket_vals)
+    plot_numbers(data_selection)
 
-numbers_form = np.sum(numbers_to_vectors(norm_data),axis=0)
-plot_vector(numbers_form)
 
+#numbers_form = np.sum(numbers_to_vectors(norm_data),axis=0)
+#plot_vector(numbers_form)
+wavelength_distribution_songs()
 exit(0)
 inputs = tf.placeholder(tf.float32, shape=(None, 1))
 
