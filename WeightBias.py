@@ -9,7 +9,7 @@ class DenseLayer:
         rand_weight = np.reshape(rand_weight_vals,(in_len,out_len))
         self.W = tf.Variable(rand_weight,name=self.weight_name())
 
-        bias_init = np.zeros(out_len,dtype='float32') + mean_val
+        bias_init = np.random.randn(out_len).astype('float32')#np.zeros(out_len,dtype='float32') + mean_val
         self.b = tf.Variable(bias_init,name=self.bias_name())#allows nice addition
 
     def calc_output(self,in_tens):

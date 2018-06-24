@@ -57,21 +57,26 @@ def wavelength_distribution_songs():
 #wavelength_distribution_songs()
 
 def get_dist_train_pred_fns(inputs,targets):
-    HIDDEN_SIZE_1 = 50
-    HIDDEN_SIZE_2 = 120
-    HIDDEN_SIZE_3 = 80
+    HIDDEN_SIZE_1 = 30
+    HIDDEN_SIZE_2 = 70
     ADAM_learning_rate = 0.001
 
 
-    in_to_hid = DenseLayer("in_to_hid",1,HIDDEN_SIZE_1)
-    hid1_to_hid2 = DenseLayer("hid1_to_hid2",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
-    hid2_to_hid3 = DenseLayer("hid2_to_hid3",HIDDEN_SIZE_2,HIDDEN_SIZE_3)
-    hid_to_out = DenseLayer("hid_to_out",HIDDEN_SIZE_3,NUM_BUCKETS)
+    in_to_hid_mul = DenseLayer("in_to_hid_mul",1,HIDDEN_SIZE_1)
+    in_to_hid_tanh = DenseLayer("in_to_hid_tanh",1,HIDDEN_SIZE_1)
+    hid1_to_hid2_mul = DenseLayer("hid1_to_hid2_mul",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
+    hid1_to_hid2_tanh = DenseLayer("hid1_to_hid2_tanh",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
+    hid_to_out = DenseLayer("hid_to_out",HIDDEN_SIZE_2,NUM_BUCKETS)
 
-    hid_layer_1 = tf.nn.relu(in_to_hid.calc_output(inputs))
-    hid_layer_2 = tf.nn.relu(hid1_to_hid2.calc_output(hid_layer_1))
-    hid_layer_3 = tf.nn.relu(hid2_to_hid3.calc_output(hid_layer_2))
-    out_layer = tf.sigmoid(hid_to_out.calc_output(hid_layer_3))
+    hid_layer_1_mul = tf.sigmoid(in_to_hid_mul.calc_output(inputs))
+    hid_layer_1_tanh = tf.nn.relu(in_to_hid_tanh.calc_output(inputs))
+    hid_layer_1_res = tf.multiply(hid_layer_1_mul,hid_layer_1_tanh)
+
+    hid_layer_2_mul = tf.sigmoid(hid1_to_hid2_mul.calc_output(hid_layer_1_res))
+    hid_layer_2_tanh = tf.nn.relu(hid1_to_hid2_tanh.calc_output(hid_layer_1_res))
+    hid_layer_2_res = tf.multiply(hid_layer_2_mul,hid_layer_2_tanh)
+
+    out_layer = tf.sigmoid(hid_to_out.calc_output(hid_layer_2_res))
 
     final_cost = tf.nn.softmax_cross_entropy_with_logits_v2(
         labels = targets,
@@ -80,7 +85,7 @@ def get_dist_train_pred_fns(inputs,targets):
 
     prediction = tf.nn.softmax(out_layer)
 
-    optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
+    optimizer = tf.train.RMSPropOptimizer(learning_rate=ADAM_learning_rate,momentum=0.9)
 
     train_op = optimizer.minimize(final_cost)
     return prediction,train_op
@@ -94,9 +99,8 @@ def run_training(sess,train_op,inputs,targets):
 
     train_input = np.reshape(norm_data,(len(norm_data),1))
     train_expected = numbers_to_vectors(train_input)
-    randomly_pull_ammount(train_input,BATCH_SIZE)
 
-    for epoc in range(5):
+    for epoc in range(10):
         for x in range(0,len(train_input)-BATCH_SIZE,BATCH_SIZE):
             sess.run(train_op,feed_dict={
                 inputs: randomly_pull_ammount(train_input,BATCH_SIZE),
