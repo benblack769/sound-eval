@@ -616,6 +616,7 @@ class WaveNetModel(object):
 
     def loss(self,
              input_batch,
+             global_vector=None,
              global_condition_batch=None,
              l2_regularization_strength=None,
              name='wavenet'):
@@ -623,12 +624,18 @@ class WaveNetModel(object):
 
         The variables are all scoped to the given name.
         '''
+        #assert not self.global_condition_channels or global_vector or global_condition_batch, "either global_vector or condition batch needs to be specified when channels are specified "
+        #assert not global_vector or not global_condition_batch, "global_vector and global_condition_batch should not be specified at the same time"
         with tf.name_scope(name):
             # We mu-law encode and quantize the input audioform.
             encoded_input = mu_law_encode(input_batch,
                                           self.quantization_channels)
 
-            gc_embedding = self._embed_gc(global_condition_batch)
+            if global_vector is not None:
+                gc_embedding = global_vector
+            else:
+                gc_embedding = self._embed_gc(global_condition_batch)
+
             encoded = self._one_hot(encoded_input)
             if self.scalar_input:
                 network_input = tf.reshape(
@@ -657,7 +664,7 @@ class WaveNetModel(object):
                                            [-1, self.quantization_channels])
                 prediction = tf.reshape(raw_output,
                                         [-1, self.quantization_channels])
-                loss = tf.nn.softmax_cross_entropy_with_logits(
+                loss = tf.nn.softmax_cross_entropy_with_logits_v2(
                     logits=prediction,
                     labels=target_output)
                 reduced_loss = tf.reduce_mean(loss)

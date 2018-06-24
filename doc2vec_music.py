@@ -56,8 +56,7 @@ def get_train_batch(song_list):
     batch_songs = [sec_gen.random_song_id() for _ in range(BATCH_SIZE)]
     batch_list = [sec_gen.random_section_in_song(song) for song in batch_songs]
     batch_matrix = np.stack(batch_list)
-    song_indicies = np.asarray(batch_songs,dtype=np.int32)
-    batch_song_indicies = np.reshape(song_indicies,(BATCH_SIZE,1))
+    batch_song_indicies = np.asarray(batch_songs,dtype=np.int32)
     return batch_song_indicies,batch_matrix
 
 def expected_from_input(batched_input):
@@ -88,17 +87,30 @@ def train_all():
         global_condition_cardinality=None # treates global_condition_channels as a simple vector, as it should
     )
 
-    loss = net.loss(input_batch=audio_batch,
-                    global_condition_batch=gc_id_batch,
-                    l2_regularization_strength=args.l2_regularization_strength)
+    audio_batch = tf.placeholder(tf.float32, shape=(BATCH_SIZE, None, 1))
+    gc_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,))
 
+    global_vectors = music_vectors.get_index_rows(gc_id_batch)
+    print("shape")
+    print(global_vectors.shape)
+    gc_vectors = tf.reshape(tf.tile(global_vectors,(1,BLOCK_SIZE)),(BATCH_SIZE,BLOCK_SIZE,SONG_VECTOR_SIZE))
+
+    loss = net.loss(input_batch=audio_batch,
+                    global_vector=gc_vectors)
+
+    optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
+    optim = optimizer.minimize(loss)
+
+    exit(0)
     init = tf.global_variables_initializer()
     with tf.Session() as sess:
         sess.run(init)
         for x in range(TRAIN_STEPS//BATCH_SIZE):
             batch_song_indicies, batch_input = get_train_batch(raw_data_list)
-            indicies = tf.constant(batch_song_indicies)
-            music_vectors.get_index_rows(indicies)
+            sess.run(optim,feed_dict={
+                audio_batch: batch_input,
+                gc_id_batch: batch_song_indicies
+            })
 
 train_all()
 exit(0)
