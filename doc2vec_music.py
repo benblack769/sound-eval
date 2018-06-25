@@ -3,7 +3,7 @@ import random
 import tensorflow as tf
 
 import process_fma_files
-from tf_fast_wavenet import wavenet_loss
+from tf_fast_wavenet import *
 
 #from WeightBias import DenseLayer
 #from fast_wavenet_model import Model, OutputVectors
@@ -12,16 +12,12 @@ from tf_fast_wavenet import wavenet_loss
 #from pixnn import discretized_mix_logistic_loss
 SAMPLERATE = 16000
 
-BLOCK_SIZE = 30
-
-SONG_VECTOR_SIZE = 4
-
-BATCH_SIZE = 4
-
-TRAIN_STEPS = 1000
+TRAIN_STEPS = 10
 
 NUM_MUSIC_FILES = 8
 ADAM_learning_rate = 0.001
+
+np.set_printoptions(floatmode='fixed')
 
 class OutputVectors:
     def __init__(self,num_songs,vector_size):

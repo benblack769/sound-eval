@@ -13,8 +13,16 @@ class DenseLayer:
         self.b = tf.Variable(bias_init,name=self.bias_name())#allows nice addition
 
     def calc_output(self,in_tens):
-        prod = tf.matmul(in_tens,self.W)
-        return tf.add(prod,self.b)
+        if(len(in_tens.shape) == 3):
+            calc_tens = tf.reshape(in_tens,(in_tens.shape[0]*in_tens.shape[1],in_tens.shape[2]))
+        else:
+            calc_tens = in_tens
+        prod = tf.matmul(calc_tens,self.W)
+        res = tf.add(prod,self.b)
+
+        if(len(in_tens.shape) == 3):
+            res = tf.reshape(res,(in_tens.shape[0],in_tens.shape[1],res.shape[1]))
+        return res
 
     def bias_name(self):
         return self.name+"b"
