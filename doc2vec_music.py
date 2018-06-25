@@ -67,11 +67,7 @@ def get_train_batch(song_list):
 def expected_from_input(batched_input):
     return np.roll(batched_input,shift=1,axis=1)
 
-def train_all():
-    music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
-
-    music_vectors = OutputVectors(len(raw_data_list),SONG_VECTOR_SIZE)
-
+def tensorflow_wavenet_loss(audio_batch,global_vector_batch):
     net = WaveNetModel(
         batch_size=BATCH_SIZE,
         #use_biases=False,# consider changing
@@ -89,17 +85,22 @@ def train_all():
         global_condition_channels=SONG_VECTOR_SIZE,
         global_condition_cardinality=None # treates global_condition_channels as a simple vector, as it should
     )
+    loss = net.loss(input_batch=audio_batch,
+                    global_vector=global_vector_batch)
+    return loss
+
+
+def train_all():
+    music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
+
+    music_vectors = OutputVectors(len(raw_data_list),SONG_VECTOR_SIZE)
 
     audio_batch = tf.placeholder(tf.float32, shape=(BATCH_SIZE, BLOCK_SIZE, 1))
     gc_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,))
 
     global_vector_batch = music_vectors.get_index_rows(gc_id_batch)
-    print("shape")
-    print(global_vector_batch.shape)
-    #gc_vectors = tf.reshape(tf.tile(global_vectors,(1,BLOCK_SIZE)),(BATCH_SIZE,BLOCK_SIZE,SONG_VECTOR_SIZE))
 
-    loss = net.loss(input_batch=audio_batch,
-                    global_vector=global_vector_batch)
+    loss = tensorflow_wavenet_loss(audio_batch,global_vector_batch)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
     optim = optimizer.minimize(loss)
