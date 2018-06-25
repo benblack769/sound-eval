@@ -3,7 +3,7 @@ import random
 import tensorflow as tf
 
 import process_fma_files
-from tf_relu_wavenet import *
+from tf_standard_repo_wavenet import *
 
 #from WeightBias import DenseLayer
 #from fast_wavenet_model import Model, OutputVectors
@@ -58,9 +58,6 @@ def get_train_batch(song_list):
     batch_song_indicies = np.asarray(batch_songs,dtype=np.int32)
     return batch_song_indicies,batch_matrix
 
-
-#def expected_from_input(batched_input):
-#    return np.roll(batched_input,shift=1,axis=1)
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
