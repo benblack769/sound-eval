@@ -10,7 +10,7 @@ from wavenet import WaveNetModel, mu_law_decode, mu_law_encode
 #from pixnn import discretized_mix_logistic_loss
 SAMPLERATE = 16000
 
-BLOCK_SIZE = 5000
+BLOCK_SIZE = 15000
 
 SONG_VECTOR_SIZE = 32
 
@@ -19,6 +19,10 @@ BATCH_SIZE = 4
 TRAIN_STEPS = 10
 
 NUM_MUSIC_FILES = 8
+
+ADAM_learning_rate = 0.001
+
+NUM_EPOCS = 5
 
 class OutputVectors:
     def __init__(self,num_songs,vector_size):
@@ -56,8 +60,9 @@ def get_train_batch(song_list):
     batch_songs = [sec_gen.random_song_id() for _ in range(BATCH_SIZE)]
     batch_list = [sec_gen.random_section_in_song(song) for song in batch_songs]
     batch_matrix = np.stack(batch_list)
+    batch_matrix_resize = np.reshape(batch_matrix,(BATCH_SIZE,BLOCK_SIZE,1))
     batch_song_indicies = np.asarray(batch_songs,dtype=np.int32)
-    return batch_song_indicies,batch_matrix
+    return batch_song_indicies,batch_matrix_resize
 
 def expected_from_input(batched_input):
     return np.roll(batched_input,shift=1,axis=1)
@@ -87,30 +92,33 @@ def train_all():
         global_condition_cardinality=None # treates global_condition_channels as a simple vector, as it should
     )
 
-    audio_batch = tf.placeholder(tf.float32, shape=(BATCH_SIZE, None, 1))
+    audio_batch = tf.placeholder(tf.float32, shape=(BATCH_SIZE, BLOCK_SIZE, 1))
     gc_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,))
 
-    global_vectors = music_vectors.get_index_rows(gc_id_batch)
+    global_vector_batch = music_vectors.get_index_rows(gc_id_batch)
     print("shape")
-    print(global_vectors.shape)
-    gc_vectors = tf.reshape(tf.tile(global_vectors,(1,BLOCK_SIZE)),(BATCH_SIZE,BLOCK_SIZE,SONG_VECTOR_SIZE))
+    print(global_vector_batch.shape)
+    #gc_vectors = tf.reshape(tf.tile(global_vectors,(1,BLOCK_SIZE)),(BATCH_SIZE,BLOCK_SIZE,SONG_VECTOR_SIZE))
 
     loss = net.loss(input_batch=audio_batch,
-                    global_vector=gc_vectors)
+                    global_vector=global_vector_batch)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
     optim = optimizer.minimize(loss)
 
-    exit(0)
     init = tf.global_variables_initializer()
     with tf.Session() as sess:
         sess.run(init)
-        for x in range(TRAIN_STEPS//BATCH_SIZE):
-            batch_song_indicies, batch_input = get_train_batch(raw_data_list)
-            sess.run(optim,feed_dict={
-                audio_batch: batch_input,
-                gc_id_batch: batch_song_indicies
-            })
+        for _ in range(NUM_EPOCS):
+            for x in range(TRAIN_STEPS//BATCH_SIZE):
+                batch_song_indicies, batch_input = get_train_batch(raw_data_list)
+                sess.run(optim,feed_dict={
+                    audio_batch: batch_input,
+                    gc_id_batch: batch_song_indicies
+                })
+            vals = music_vectors.get_vector_values(sess)
+            np.save("arg.npy",vals)
+            print(vals)
 
 train_all()
 exit(0)

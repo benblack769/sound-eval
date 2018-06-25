@@ -191,11 +191,11 @@ class WaveNetModel(object):
                         if self.global_condition_channels is not None:
                             current['gc_gateweights'] = create_variable(
                                 'gc_gate',
-                                [1, self.global_condition_channels,
+                                [self.global_condition_channels,
                                  self.dilation_channels])
                             current['gc_filtweights'] = create_variable(
                                 'gc_filter',
-                                [1, self.global_condition_channels,
+                                [self.global_condition_channels,
                                  self.dilation_channels])
 
                         if self.use_biases:
@@ -280,17 +280,12 @@ class WaveNetModel(object):
 
         if global_condition_batch is not None:
             weights_gc_filter = variables['gc_filtweights']
-            conv_filter = conv_filter + tf.nn.conv1d(global_condition_batch,
-                                                     weights_gc_filter,
-                                                     stride=1,
-                                                     padding="SAME",
-                                                     name="gc_filter")
+            global_filter = tf.matmul(global_condition_batch,weights_gc_filter)
+            conv_filter = tf.add(conv_filter,tf.reshape(global_filter,(self.batch_size,1,self.global_condition_channels)))
+
             weights_gc_gate = variables['gc_gateweights']
-            conv_gate = conv_gate + tf.nn.conv1d(global_condition_batch,
-                                                 weights_gc_gate,
-                                                 stride=1,
-                                                 padding="SAME",
-                                                 name="gc_gate")
+            global_filter = tf.matmul(global_condition_batch,weights_gc_gate)
+            conv_gate = tf.add(conv_gate,tf.reshape(global_filter,(self.batch_size,1,self.global_condition_channels)))
 
         if self.use_biases:
             filter_bias = variables['filter_bias']
