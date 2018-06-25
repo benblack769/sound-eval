@@ -2,7 +2,7 @@ import tensorflow as tf
 from WeightBias import DenseLayer
 
 LAYER_WIDTH=16
-BATCH_SIZE=4
+BATCH_SIZE=1
 HIDDEN_SIZE=64
 
 QUANTIZATION_CHANNELS=64
@@ -13,6 +13,9 @@ SONG_VECTOR_SIZE = 24
 
 USE_SCALAR_INPUT = False
 
+USE_GPU = False
+
+STANDARD_SAVE_REPO = "../relu_repo_results/"
 
 def mu_law_encode(audio, quantization_channels):
     '''Quantizes waveform amplitudes.'''

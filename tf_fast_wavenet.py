@@ -9,10 +9,11 @@ BLOCK_SIZE = 3000
 
 SONG_VECTOR_SIZE = 16
 
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 
+USE_GPU = False
 
-
+STANDARD_SAVE_REPO = "../fast_repo_results/"
 
 def shift_x(x,shift_ammount):
     # the 0 axis here is the batch axis, so the 1 axis

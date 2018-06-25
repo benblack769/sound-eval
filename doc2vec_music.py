@@ -1,9 +1,11 @@
 import numpy as np
 import random
 import tensorflow as tf
+import os
 
 import process_fma_files
 from tf_standard_repo_wavenet import *
+from vector_result_processing import ResultsTotal
 
 #from WeightBias import DenseLayer
 #from fast_wavenet_model import Model, OutputVectors
@@ -12,9 +14,9 @@ from tf_standard_repo_wavenet import *
 #from pixnn import discretized_mix_logistic_loss
 SAMPLERATE = 16000
 
-TRAIN_STEPS = 100
+TRAIN_STEPS_PER_SAVE = 2000
 
-NUM_MUSIC_FILES = 8
+NUM_MUSIC_FILES = 2000
 ADAM_learning_rate = 0.001
 
 np.set_printoptions(floatmode='fixed')
@@ -50,6 +52,10 @@ class SectionGenerator:
         assert len(song) >= start_loc+BLOCK_SIZE
         return song[start_loc:start_loc+BLOCK_SIZE]
 
+def save_string(filename,string):
+    with open(filename,'w') as file:
+        file.write(string)
+
 def get_train_batch(song_list):
     sec_gen = SectionGenerator(song_list)
     batch_songs = [sec_gen.random_song_id() for _ in range(BATCH_SIZE)]
@@ -64,6 +70,7 @@ def train_all():
 
     music_vectors = OutputVectors(len(raw_data_list),SONG_VECTOR_SIZE)
 
+
     audio_batch = tf.placeholder(tf.float32, shape=(BATCH_SIZE, BLOCK_SIZE))
     gc_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,))
 
@@ -74,102 +81,37 @@ def train_all():
     optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
     optim = optimizer.minimize(loss)
 
-    init = tf.global_variables_initializer()
-    with tf.Session() as sess:
-        sess.run(init)
-        for epoc in range(100):
-            for x in range(TRAIN_STEPS//BATCH_SIZE):
+    result_collection = ResultsTotal(STANDARD_SAVE_REPO)
+    weight_saver = tf.train.Saver()
+
+    config = tf.ConfigProto(
+        device_count = {'GPU': int(USE_GPU)}
+    )
+
+    with tf.Session(config=config) as sess:
+        if os.path.exists(STANDARD_SAVE_REPO):
+            epoc_start = int(open(STANDARD_SAVE_REPO+"epoc_num.txt").read())
+            weight_saver.restore(sess,tf.train.latest_checkpoint(STANDARD_SAVE_REPO))
+        else:
+            os.makedirs(STANDARD_SAVE_REPO)
+            epoc_start = 0
+            init = tf.global_variables_initializer()
+            sess.run(init)
+
+        for epoc in range(epoc_start,100000000000):
+            epoc_loss_sum = 0
+            print("EPOC: {}".format(epoc))
+            for x in range(TRAIN_STEPS_PER_SAVE//BATCH_SIZE):
                 batch_song_indicies, batch_input = get_train_batch(raw_data_list)
                 opt_res,loss_res = sess.run([optim,loss],feed_dict={
                     audio_batch: batch_input,
                     gc_id_batch: batch_song_indicies
                 })
-                print(loss_res)
+                epoc_loss_sum += loss_res
+                print(epoc_loss_sum/(x+1))
             vals = music_vectors.get_vector_values(sess)
-            np.save("arg.npy",vals)
-            print(vals)
+            save_string(STANDARD_SAVE_REPO+"epoc_num.txt",str(epoc))
+            result_collection.save_file(vals,epoc)
+            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc)
 
 train_all()
-exit(0)
-def get_dist_train_pred_fns(inputs,targets):
-    HIDDEN_SIZE_1 = 30
-    HIDDEN_SIZE_2 = 70
-    ADAM_learning_rate = 0.001
-
-
-    in_to_hid_mul = DenseLayer("in_to_hid_mul",1,HIDDEN_SIZE_1)
-    in_to_hid_tanh = DenseLayer("in_to_hid_tanh",1,HIDDEN_SIZE_1)
-    hid1_to_hid2_mul = DenseLayer("hid1_to_hid2_mul",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
-    hid1_to_hid2_tanh = DenseLayer("hid1_to_hid2_tanh",HIDDEN_SIZE_1,HIDDEN_SIZE_2)
-    hid_to_out = DenseLayer("hid_to_out",HIDDEN_SIZE_2,NUM_BUCKETS)
-
-    hid_layer_1_mul = tf.sigmoid(in_to_hid_mul.calc_output(inputs))
-    hid_layer_1_tanh = tf.nn.relu(in_to_hid_tanh.calc_output(inputs))
-    hid_layer_1_res = tf.multiply(hid_layer_1_mul,hid_layer_1_tanh)
-
-    hid_layer_2_mul = tf.sigmoid(hid1_to_hid2_mul.calc_output(hid_layer_1_res))
-    hid_layer_2_tanh = tf.nn.relu(hid1_to_hid2_tanh.calc_output(hid_layer_1_res))
-    hid_layer_2_res = tf.multiply(hid_layer_2_mul,hid_layer_2_tanh)
-
-    out_layer = tf.sigmoid(hid_to_out.calc_output(hid_layer_2_res))
-
-    final_cost = tf.nn.softmax_cross_entropy_with_logits_v2(
-        labels = targets,
-        logits = out_layer,
-    )
-
-    prediction = tf.nn.softmax(out_layer)
-
-    optimizer = tf.train.RMSPropOptimizer(learning_rate=ADAM_learning_rate,momentum=0.9)
-
-    train_op = optimizer.minimize(final_cost)
-    return prediction,train_op
-
-def randomly_pull_ammount(nparr,batch_size):
-    indicies = np.random.choice(len(nparr), batch_size)
-    return np.stack(nparr[idx] for idx in indicies)
-
-def run_training(sess,train_op,inputs,targets):
-    BATCH_SIZE = 32
-
-    train_input = np.reshape(norm_data,(len(norm_data),1))
-    train_expected = numbers_to_vectors(train_input)
-
-    for epoc in range(10):
-        for x in range(0,len(train_input)-BATCH_SIZE,BATCH_SIZE):
-            sess.run(train_op,feed_dict={
-                inputs: randomly_pull_ammount(train_input,BATCH_SIZE),
-                targets: randomly_pull_ammount(train_expected,BATCH_SIZE),
-            })
-
-def run_test(sess,pred_op,inputs,targets):
-    test_input = np.reshape(test_data,(len(test_data),1))
-    test_expected = numbers_to_vectors(test_input)
-    sample = 5
-    result = sess.run(pred_op,feed_dict={
-        inputs: test_input[sample:sample+5],
-        targets: test_expected[sample:sample+5],
-    })
-    print(result)
-
-
-
-
-def run_all():
-    inputs = tf.placeholder(tf.float32, shape=(None, 1))
-    targets = tf.placeholder(tf.float32, shape=(None, NUM_BUCKETS))
-
-    pred_op,train_op = get_dist_train_pred_fns(inputs,targets)
-
-    init = tf.global_variables_initializer()
-
-    with tf.Session() as sess:
-        sess.run(init)
-        print("initted",flush=True)
-        run_training(sess,train_op,inputs,targets)
-        print("training finished",flush=True)
-        run_test(sess,pred_op,inputs,targets)
-
-run_all()
-
-exit(0)

@@ -4,6 +4,10 @@ SONG_VECTOR_SIZE = 32
 BATCH_SIZE = 2
 BLOCK_SIZE = 8000
 
+USE_GPU = True
+
+STANDARD_SAVE_REPO = "../standard_repo_results/"
+
 def wavenet_loss(audio_batch,global_vector_batch):
     net = WaveNetModel(
         batch_size=BATCH_SIZE,
