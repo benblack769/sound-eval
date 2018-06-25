@@ -5,3 +5,4 @@ plots
 saved_weights
 *.h5
 log
+*.npy
