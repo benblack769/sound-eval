@@ -12,7 +12,7 @@ from tf_relu_wavenet import *
 #from pixnn import discretized_mix_logistic_loss
 SAMPLERATE = 16000
 
-TRAIN_STEPS = 10
+TRAIN_STEPS = 100
 
 NUM_MUSIC_FILES = 8
 ADAM_learning_rate = 0.001
@@ -83,10 +83,11 @@ def train_all():
         for epoc in range(100):
             for x in range(TRAIN_STEPS//BATCH_SIZE):
                 batch_song_indicies, batch_input = get_train_batch(raw_data_list)
-                sess.run(optim,feed_dict={
+                opt_res,loss_res = sess.run([optim,loss],feed_dict={
                     audio_batch: batch_input,
                     gc_id_batch: batch_song_indicies
                 })
+                print(loss_res)
             vals = music_vectors.get_vector_values(sess)
             np.save("arg.npy",vals)
             print(vals)

@@ -35,10 +35,7 @@ def quantitize_audio_to_1hot(audio,quantization_channels):
     return vecs
 
 def shift_x(x,shift_ammount):
-    # the 0 axis here is the batch axis, so the 1 axis
-    # is the 0 axis to keras
-    tensorflow_0_axis = 1
-    val = tf.manip.roll(x,shift=shift_ammount,axis=tensorflow_0_axis)
+    val = tf.manip.roll(x,shift=shift_ammount,axis=1)
     return val
 
 def dialate_layer(input, glob_vector, dialate_length):
