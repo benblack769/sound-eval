@@ -64,6 +64,9 @@ def get_train_batch(song_list):
     batch_song_indicies = np.asarray(batch_songs,dtype=np.int32)
     return batch_song_indicies,batch_matrix
 
+def save_music_name_list(path_list):
+    save_str = "\n".join([os.path.basename(path) for path in path_list])
+    save_string(SONG_VECTOR_SIZE+"music_list.txt",save_str)
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
@@ -89,6 +92,7 @@ def train_all():
     )
 
     with tf.Session(config=config) as sess:
+        save_music_name_list(music_paths)
         if os.path.exists(STANDARD_SAVE_REPO):
             epoc_start = int(open(STANDARD_SAVE_REPO+"epoc_num.txt").read())
             weight_saver.restore(sess,tf.train.latest_checkpoint(STANDARD_SAVE_REPO))

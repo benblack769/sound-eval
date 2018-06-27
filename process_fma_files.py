@@ -30,11 +30,12 @@ def get_raw_data_list(sample_rate, num_files=20):
     all_base_paths = get_all_music_paths()
     if len(all_base_paths)  < num_files:
         print("Warning: Querrired too many files")
-
+    print("start")
     full_base_paths = all_base_paths[:min(num_files, len(all_base_paths))]
 
-    full_subfolder_data = process_files_parallel(full_base_paths,sample_rate)
+    full_subfolder_data = list(process_files_parallel(full_base_paths,sample_rate))
 
     subfolder_data = [data for data in full_subfolder_data if data is not None]
     base_paths = [path for data,path in zip(full_subfolder_data,full_base_paths) if data is not None]
+
     return base_paths,subfolder_data
