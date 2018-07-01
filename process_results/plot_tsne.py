@@ -13,8 +13,8 @@ def plot_tsne(data):
 
 if __name__ == "__main__":
     vectors_folder = "../relu_repo_results/"
-    vectors_file = "vector_at_999.npy"
-    plot_tsne_results = "process_results/relu_repo_results_999_2d.npy"
+    vectors_file = "vector_at_1851.npy"
+    plot_tsne_results = "process_results/relu_repo_results_1851_2d.npy"
     data = np.load(vectors_folder+vectors_file)
     data2d = plot_tsne(data)
     np.save(plot_tsne_results,data2d)

@@ -6,3 +6,5 @@ saved_weights
 *.h5
 log
 *.npy
+relu_repo_results
+standard_repo_results

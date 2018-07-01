@@ -4,7 +4,7 @@ import tensorflow as tf
 import os
 
 import process_fma_files
-from tf_standard_repo_wavenet import *
+from tf_relu_wavenet import *
 from vector_result_processing import ResultsTotal
 
 #from WeightBias import DenseLayer
@@ -14,9 +14,9 @@ from vector_result_processing import ResultsTotal
 #from pixnn import discretized_mix_logistic_loss
 SAMPLERATE = 16000
 
-TRAIN_STEPS_PER_SAVE = 2000
+TRAIN_STEPS_PER_SAVE = 50000
 
-NUM_MUSIC_FILES = 2000
+NUM_MUSIC_FILES = 5000
 ADAM_learning_rate = 0.001
 
 np.set_printoptions(floatmode='fixed')

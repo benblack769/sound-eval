@@ -47,7 +47,7 @@ def get_test_train(data1,data2):
     return (train_data1,train_data2),(test_data1,test_data2)
 
 def run_regression(high_d_data,genre_data):
-    genre_boolean_data = [gen == '17'or gen == '2' for gen in genre_data]
+    genre_boolean_data = [gen == '17'for gen in genre_data]
     print(sum(genre_boolean_data)/len(genre_boolean_data))
     logit_model = sklearn.linear_model.LogisticRegression()
     (train_highd,train_genre),(test_highd,test_genre) = get_test_train(high_d_data,genre_boolean_data)
@@ -107,8 +107,8 @@ def plot_associated_data(df):
 
 if __name__ == "__main__":
     music_filename = "music_list.txt"
-    raw_data = "../relu_repo_results/vector_at_949.npy"
-    plot_tsne_results = "process_results/relu_repo_results_999_2d.npy"
+    raw_data = "../relu_repo_results/vector_at_4110.npy"
+    plot_tsne_results = "process_results/relu_repo_results_4110_2d.npy"
     full_d_data = np.load(raw_data)
     tsne_data = np.load(plot_tsne_results)
     genre_ids = get_genre_ids(music_filename)

@@ -1,8 +1,8 @@
 from wavenet import WaveNetModel
 
-SONG_VECTOR_SIZE = 32
-BATCH_SIZE = 2
-BLOCK_SIZE = 8000
+SONG_VECTOR_SIZE = 24
+BATCH_SIZE = 1
+BLOCK_SIZE = 4000
 
 USE_GPU = True
 
@@ -13,9 +13,8 @@ def wavenet_loss(audio_batch,global_vector_batch):
         batch_size=BATCH_SIZE,
         #use_biases=False,# consider changing
         filter_width=2,
-        dilations=[1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+        dilations=[1, 2, 4, 8, 16, 32, 64, 128, 256,
+                   1, 2, 4, 8, 16, 32, 64, 128, 256],
         residual_channels=32,
         dilation_channels=32,
         quantization_channels=128,
