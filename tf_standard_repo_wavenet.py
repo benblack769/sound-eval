@@ -1,6 +1,6 @@
 from wavenet import WaveNetModel
 
-SONG_VECTOR_SIZE = 24
+SONG_VECTOR_SIZE = 32
 BATCH_SIZE = 1
 BLOCK_SIZE = 4000
 
