@@ -4,7 +4,7 @@ import tensorflow as tf
 import os
 
 import process_fma_files
-from tf_relu_wavenet import *
+from tf_standard_repo_wavenet import *
 from vector_result_processing import ResultsTotal
 
 #from WeightBias import DenseLayer
@@ -66,7 +66,7 @@ def get_train_batch(song_list):
 
 def save_music_name_list(path_list):
     save_str = "\n".join([os.path.basename(path) for path in path_list])
-    save_string(SONG_VECTOR_SIZE+"music_list.txt",save_str)
+    save_string(STANDARD_SAVE_REPO+"music_list.txt",save_str)
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
@@ -92,15 +92,18 @@ def train_all():
     )
 
     with tf.Session(config=config) as sess:
-        save_music_name_list(music_paths)
         if os.path.exists(STANDARD_SAVE_REPO):
             epoc_start = int(open(STANDARD_SAVE_REPO+"epoc_num.txt").read())
             weight_saver.restore(sess,tf.train.latest_checkpoint(STANDARD_SAVE_REPO))
+            save_music_name_list(music_paths)
         else:
             os.makedirs(STANDARD_SAVE_REPO)
+            save_music_name_list(music_paths)
             epoc_start = 0
+            save_string(STANDARD_SAVE_REPO+"epoc_num.txt",str(epoc_start))
             init = tf.global_variables_initializer()
             sess.run(init)
+            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc_start)
 
         for epoc in range(epoc_start,100000000000):
             epoc_loss_sum = 0
