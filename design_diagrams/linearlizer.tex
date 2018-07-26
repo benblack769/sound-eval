@@ -1,0 +1,60 @@
+\documentclass{article}
+\usepackage{fullpage}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{url}
+\usepackage{cite}
+
+\begin{document}
+\hfill \textbf{Linear vector representations of time series data}
+
+\hfill Ben Black
+
+\section{Linear vector embeddings}
+
+Word2vec, a set of vector word embedding algorithms, transformed certain areas of natural language processing. It had great success in semantic analysis, for example.\cite{w2v1} Now, researchers, startups, and hobbyists are using this new tool for all sorts of tasks, including automatic classification (CITE!), tracking word usage over time (CITE!), etc. 
+
+The way in which this tool works is as remarkable as its success. The algorithm outputs the weights in a layer of a neural network. These weights are typically considered to be a black box, devoid of any interpretation outside the network. But in this case, they have remarkably natural relative interpretations, in particular the famous $\text{man} - \text{King} = \text{woman} - \text{Queen}$. This remarkable quality sparked a theoretical investigation into its success, which unusually for neural network based models, produced a 
+
+In light of this success, a theoretical investigation into this new tool revealed its close relation Truncated Singular Value Decomposition, a linear algebra technique to compress a large matrix into two smaller matrices. 
+\cite{random_walk_pmi}
+\cite{NIPS2014_5477}
+
+
+What all these methods have in common is a single output matrix that converts the layer into a value that represents the distance between two words. 
+
+That is, for the $i,j$th entry of the PMI matrix, you calculate it with $I_i \cdot O^t_j$, where $I$ and is a $n$ by $m$ matrix, and $O$ is an $m$ by $n$ matrix.  So you can get all values of the matrix with $IO$, but without actually ever storing that huge matrix in memory. 
+
+
+Word2vec is specialized to operate on sparse time series data. We hope to introduce a model that gives vectors with similar sorts of linear algebra properties, but that operates on dense time series data, that is, time series which each time step is a large, dense vector, rather than a sparse unique identifier. We hope that this model will allow non-specialists to use clustering, linear regression and other sorts of fast, well known algorithms that depend on these linear assumptions. 
+
+\section{Non-linear vector embeddings}
+
+Dense data has had vector embeddings for a long time. In particular, generative models for images have used vector embeddings (CITE!). However, the resulting vector does not have the nice linear properties of word2vec, and is unusable without complex non-linear approximation techniques like neural networks.
+
+This work proposes a simple way of generating vector embeddings without a generative network. Instead, it takes a page from word2vec and generates a "closeness" value that signals how temporally far apart two vectors are. 
+
+Now, how is this "closeness" value created and why does it imply the desired linear algebra properties?
+
+The matrix version, each sparse id is assigned a vector for the input and the output, and the distance between the two is the distance between the vectors. 
+
+So in this dense version, there is two non-linear mappings between the dense input and two vectors, 
+
+Version ideas:
+
+two function mapping
+
+$d(F(x),G(y))$
+
+direct mapping:
+
+$d(F(x),F(y))$
+
+indirect mapping
+
+$d(F(x),G(F(y)))$ where $G$ is a linear function
+
+
+\bibliography{linearlizer}{}
+\bibliographystyle{plain}
+
+\end{document}
