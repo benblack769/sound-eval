@@ -16,31 +16,31 @@ CHANCE_SAME_SONG = 0.25
 
 SAMPLERATE = 16000
 
-TRAIN_STEPS_PER_SAVE = 10000000
-TRAIN_STEPS_PER_PRINT = 5000
+TRAIN_STEPS_PER_SAVE = 20000000
+TRAIN_STEPS_PER_PRINT = 50000
 
 NUM_MUSIC_FILES = 4500
+#SGD_learning_rate = 0.004
 ADAM_learning_rate = 0.001
 
 OUTPUT_VECTOR_SIZE = 32
 
 TIME_SEGMENT_SIZE = 0.1
-WINDOW_SIZE = 4
+WINDOW_SIZE = 5
 
 LOWER_EDGE_HERTZ = 80.0
 UPPER_EDGE_HERTZ = 7600.0
 NUM_MEL_BINS = 64
 
-USE_GPU = False
+USE_GPU = True
 
-BATCH_SIZE = 128
+BATCH_SIZE = 1024
 
 STANDARD_SAVE_REPO = "../non-linear-repo/"
 
 class OutputVectors:
     def __init__(self,num_songs,vector_size):
-        init_val_flat = np.random.randn(num_songs*vector_size).astype('float32')
-        init_val = np.reshape(init_val_flat,(num_songs,vector_size))
+        init_val = np.random.standard_normal((num_songs,vector_size)).astype('float32')/vector_size
 
         self.num_songs = num_songs
         self.vector_size = vector_size
@@ -60,7 +60,7 @@ def find_random_comparison(song_list):
     NOT_SAME_VAL = 0
     is_same_val = SAME_VAL if random.random() < CHANCE_SAME_SONG else NOT_SAME_VAL
     numpy_song_idx = np.reshape(np.int32(song_idx),(1,))
-    numpy_is_same_val = np.reshape(np.float32(is_same_val),(1,))
+    numpy_is_same_val = np.float32(is_same_val)
 
     assert len(song_spec) > WINDOW_SIZE*2+1
     choice_origin_idx = random.randrange(WINDOW_SIZE,len(song_spec)-WINDOW_SIZE)
@@ -149,7 +149,10 @@ def spectrify_audios(audio_list):
                 signals: raw_sound.reshape((1,len(raw_sound))),
             })
             spectrogram_list.append(pow_spec_res[0][0])
-        return spectrogram_list
+
+    smallest_spectrogram_len = min([len(spec) for spec in spectrogram_list])
+    crop_all = [spec[:smallest_spectrogram_len] for spec in spectrogram_list]
+    return np.stack(crop_all)
 
 def sqr(x):
     return x * x
@@ -157,28 +160,56 @@ def sqr(x):
 def liniearlizer_loss(origin, cross, song_vectors, is_same):
     HIDDEN_LEN = int(NUM_MEL_BINS*1.5)
     origin_next = tf.nn.relu(DenseLayer('relu_origin',NUM_MEL_BINS,HIDDEN_LEN).calc_output(origin))
-    origin_vec = tf.nn.sigmoid(DenseLayer('soft_origin',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(origin_next))
+    origin_vec = DenseLayer('soft_origin',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(origin_next)
 
     cross_next = tf.nn.relu(DenseLayer('relu_cross',NUM_MEL_BINS,HIDDEN_LEN).calc_output(cross))
-    cross_vec = tf.nn.sigmoid(DenseLayer('soft_origin',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(cross_next))
+    cross_vec = DenseLayer('soft_cross',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(cross_next)
 
-    return tf.reduce_sum(sqr(cross_vec - origin_vec - song_vectors))
+    input_vec = origin_vec + song_vectors
+    output_vec = cross_vec
+    logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=1)*0.1)
+    cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
+    return tf.reduce_mean(cost)
+
+def get_batch_from_var(flat_spectrified_var, spectrified_shape):
+    num_time_slots = spectrified_shape[0] * spectrified_shape[1]
+    base_time_slot_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=WINDOW_SIZE,maxval=num_time_slots-WINDOW_SIZE)
+    song_ids = tf.floordiv(base_time_slot_ids,np.int32(spectrified_shape[1]))
+
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
+    compare_invalid_ids = tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=0,maxval=num_time_slots)
+    compare_ids = tf.concat([compare_valid_ids,compare_invalid_ids],axis=0)
+
+    valid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
+    invalid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)
+    is_correct = tf.concat([valid_is_trues,invalid_is_trues],axis=0)
+
+    orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
+    compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
+    print(orign_vecs.shape)
+    return orign_vecs,compare_vecs,song_ids,is_correct
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
     spectrified_list = spectrify_audios(raw_data_list)
 
+    num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
+    flat_spectrified_list = spectrified_list.reshape((num_song_ids,spectrified_list.shape[2]))
+    flat_spectrified_var = tf.Variable(initial_value=flat_spectrified_list,trainable=False)
+
     music_vectors = OutputVectors(len(spectrified_list),OUTPUT_VECTOR_SIZE)
 
-    origin_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
-    cross_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
-    song_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE, 1))
-    is_same_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE,1))
+    #origin_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
+    #cross_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
+    #song_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,1))
+    #is_same_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE,))
+    origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var,spectrified_list.shape)
 
     global_vectors = music_vectors.get_index_rows(song_id_batch)
 
     loss = liniearlizer_loss(origin_compare, cross_compare, global_vectors, is_same_compare)
 
+    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
     optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
     optim = optimizer.minimize(loss)
 
@@ -208,14 +239,8 @@ def train_all():
             epoc_loss_sum = 0
             print("EPOC: {}".format(epoc))
             for x in range(TRAIN_STEPS_PER_SAVE//BATCH_SIZE):
-                origin_d, compare_d, song_id_d, is_same_d = get_train_batch(spectrified_list)
                 #print()
-                opt_res,loss_res = sess.run([optim,loss],feed_dict={
-                    origin_compare: origin_d,
-                    cross_compare: compare_d,
-                    song_id_batch: song_id_d,
-                    is_same_compare: is_same_d
-                })
+                opt_res,loss_res = sess.run([optim,loss])
                 epoc_loss_sum += loss_res
                 train_steps += 1
                 if train_steps % (TRAIN_STEPS_PER_PRINT//BATCH_SIZE) == 0:
