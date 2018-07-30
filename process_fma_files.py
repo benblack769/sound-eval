@@ -7,7 +7,7 @@ import concurrent.futures
 from file_processing import mp3_to_raw_data, raw_data_to_wav
 
 def get_all_music_paths():
-    find_call = "find ../fma_small -type f"
+    find_call = "find ../../../Downloads/midiworld_mp3/ -type f"
     file_list = subprocess.check_output(find_call.split(" ")).decode('utf-8').split()
     mp3_list = [name for name in file_list if name[-4:] == ".mp3"]
     return mp3_list

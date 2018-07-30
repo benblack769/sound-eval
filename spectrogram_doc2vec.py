@@ -16,23 +16,24 @@ CHANCE_SAME_SONG = 0.25
 
 SAMPLERATE = 16000
 
-TRAIN_STEPS_PER_SAVE = 50000
+TRAIN_STEPS_PER_SAVE = 10000000
 TRAIN_STEPS_PER_PRINT = 5000
 
-NUM_MUSIC_FILES = 50
+NUM_MUSIC_FILES = 4500
 ADAM_learning_rate = 0.001
 
-OUTPUT_VECTOR_SIZE = 24
+OUTPUT_VECTOR_SIZE = 32
 
 TIME_SEGMENT_SIZE = 0.1
+WINDOW_SIZE = 4
 
 LOWER_EDGE_HERTZ = 80.0
 UPPER_EDGE_HERTZ = 7600.0
 NUM_MEL_BINS = 64
 
-USE_GPU = True
+USE_GPU = False
 
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 
 STANDARD_SAVE_REPO = "../non-linear-repo/"
 
@@ -54,18 +55,25 @@ class OutputVectors:
 def find_random_comparison(song_list):
     song_idx = random.randrange(len(song_list))
     song_spec = song_list[song_idx]
-    assert len(song_spec) > 1
-    choice_origin_idx = random.randrange(len(song_spec)-1)
 
-    SAME_VAL = np.reshape(np.float32(1),(1,))
-    NOT_SAME_VAL = np.reshape(np.float32(0),(1,))
+    SAME_VAL = 1
+    NOT_SAME_VAL = 0
+    is_same_val = SAME_VAL if random.random() < CHANCE_SAME_SONG else NOT_SAME_VAL
     numpy_song_idx = np.reshape(np.int32(song_idx),(1,))
+    numpy_is_same_val = np.reshape(np.float32(is_same_val),(1,))
+
+    assert len(song_spec) > WINDOW_SIZE*2+1
+    choice_origin_idx = random.randrange(WINDOW_SIZE,len(song_spec)-WINDOW_SIZE)
+
     if random.random() < CHANCE_SAME_SONG:
-        return [song_spec[choice_origin_idx],song_spec[choice_origin_idx+1],numpy_song_idx,SAME_VAL]
+        offset_idx = choice_origin_idx + random.randint(-WINDOW_SIZE,WINDOW_SIZE)
+        compare_vec = song_spec[offset_idx]
     else:
         other_song = random.choice(song_list)
         other_idx = random.randrange(len(other_song))
-        return [song_spec[choice_origin_idx],song_spec[other_idx],numpy_song_idx,NOT_SAME_VAL]
+        compare_vec = song_spec[other_idx]
+
+    return [song_spec[choice_origin_idx],compare_vec,numpy_song_idx,numpy_is_same_val]
 
 def get_train_batch(song_list):
     comparisons = [find_random_comparison(song_list) for _ in range(BATCH_SIZE)]
@@ -131,7 +139,10 @@ def spectrify_audios(audio_list):
     signals = tf.placeholder(tf.float32, [1, None])
     spectrogram = tf_spectrify(signals)
 
-    with tf.Session() as sess:
+    config = tf.ConfigProto(
+        device_count = {'GPU': int(False)}
+    )
+    with tf.Session(config=config) as sess:
         spectrogram_list = []
         for raw_sound in audio_list:
             pow_spec_res = sess.run([spectrogram],feed_dict={
