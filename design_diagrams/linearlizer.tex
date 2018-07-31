@@ -3,6 +3,10 @@
 \usepackage{amsmath,amsthm,amssymb}
 \usepackage{url}
 \usepackage{cite}
+\usepackage{xcolor,colortbl}
+\usepackage{graphicx}
+\usepackage{tikz}
+
 
 \begin{document}
 \hfill \textbf{Linear vector representations of time series data}
@@ -39,19 +43,111 @@ The matrix version, each sparse id is assigned a vector for the input and the ou
 
 So in this dense version, there is two non-linear mappings between the dense input and two vectors, 
 
-Version ideas:
+\section{Implementation concepts}
 
-two function mapping
+In the midi converter, it lists chords and creates windows around them. For example, in Mary had a little lamb,
 
-$d(F(x),G(y))$
+\newcommand{\inwindow}{\cellcolor{red!40}}
+\newcommand{\windowcenter}{\cellcolor{red!80}}
+\begin{tabular}{|c|c|c|c|c|c|}
+	\hline
+	\windowcenter $E$ & \inwindow $D$ & \inwindow $C$ & $D$ & $E$ & $E$ \\
+	\inwindow $E$ & \windowcenter $D$ & \inwindow $C$ & \inwindow $D$ & $E$ & $E$ \\
+	\inwindow $E$ & \inwindow $D$ & \windowcenter $C$ & \inwindow $D$ & \inwindow $E$ & $E$ \\
+	 $E$ & \inwindow $D$ & \inwindow $C$ & \windowcenter $D$ & \inwindow $E$ & \inwindow $E$ \\
+	\hline
+\end{tabular}
 
-direct mapping:
+Notes within these bounds are considered to be "near" and those not in these bounds are "far". 
 
-$d(F(x),F(y))$
+\includegraphics[scale=0.5]{mary_good_waveform.png}
 
-indirect mapping
 
-$d(F(x),G(F(y)))$ where $G$ is a linear function
+Raw sound does not have predefined notes with discrete values, however, using ffts, it can be divided in a similar way using standard methods. For example, here is the exact same sequence of notes, played by timidity++, a midi sequencer:
+
+\begin{figure}
+	\caption{Notes as a modified spectrogram}
+	\includegraphics[scale=0.8]{mary_start_plot.png}
+\end{figure}
+
+Alt
+
+The song is divided into a smaller number of discrete time chunks. Right now, the implementation creates 10 time chunks per second. 
+
+
+\section{Time chunk analysis}
+
+The idea is to try to approximate the time series distance function 
+
+
+% python script to generate table:
+
+%size = 10
+%window=2
+%
+%def t_val(idx):
+%return "t"+str(idx+1) 
+%
+%row1 = " & " + " & ".join(t_val(i) for i in range(size))
+%res_list = [row1]
+%for x in range(size):
+%row_header = t_val(x)
+%row = [row_header]
+%for y in range(size):
+%row.append("1" if abs(y - x) <= 2 else "0")
+%res_list.append(" & ".join(row))
+%
+%res_str = "\\begin{tabular}" + "{" + "|c"*(size+1) + "|" + "}" + "\n"
+%res_str += "\\hline \n"
+%res_str += "\\\\ \\hline \n".join(res_list)
+%res_str += "\\\\ \\hline \n"
+%res_str += "\\end{tabular}"
+%print(res_str)
+
+
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+	\hline 
+	& t1 & t2 & t3 & t4 & t5 & t6 & t7 & t8 & t9 & t10\\ \hline 
+	t1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\ \hline 
+	t2 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\ \hline 
+	t3 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0\\ \hline 
+	t4 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0\\ \hline 
+	t5 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0\\ \hline 
+	t6 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0\\ \hline 
+	t7 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0\\ \hline 
+	t8 & 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1\\ \hline 
+	t9 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1\\ \hline 
+	t10 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1\\ \hline 
+\end{tabular}
+
+However, we will approximate this function using the value of the time series at that time chunk. That is done by transforming the time chunk into a vector, and inputting it into a neural network which is trying to approximate the distance matrix. 
+
+The neural network algorithm looks like this:
+
+With input vectors, $I_1, I_2$, and seperate, but identical multi-layer networks 1 and 2, 	
+
+\begin{tikzpicture}[]
+
+\node at (0,2) [rect, draw]   (ti1) {$I_{t1}$};
+\node at (4,2) [rect, draw]   (tv1) {$V_{t1}$};
+\node at (0,0) [rect, draw]   (ti2) {$I_{t2}$};
+\node at (4,0) [rect, draw]   (tv2) {$V_{t2}$};
+\node at (6,1) [circle, draw]   (dot) {dot};
+\node at (9,1) [rect, draw]   (approx) {Approximate distance};
+
+\path[every node/.style={font=\sffamily\footnotesize}]
+(ti1) [->] edge node [] {Multi-layer-network 1} (tv1)
+(ti2) [->] edge node [] {Multi-layer-network 2} (tv2)
+(tv1) [->] edge node [] {} (dot)
+(tv2) [->] edge node [] {} (dot)
+(dot) [->] edge node [] {} (approx);
+\end{tikzpicture}
+
+
+The neural network is given the task of approximating the following distance function. 
+
+
+$l = \sigma(F(x) G(y))$
 
 
 \bibliography{linearlizer}{}

@@ -1,6 +1,6 @@
 import numpy as np
 import random
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
@@ -19,7 +19,7 @@ SAMPLERATE = 16000
 TRAIN_STEPS_PER_SAVE = 20000000
 TRAIN_STEPS_PER_PRINT = 50000
 
-NUM_MUSIC_FILES = 4500
+NUM_MUSIC_FILES = 4897
 #SGD_learning_rate = 0.004
 ADAM_learning_rate = 0.001
 
@@ -84,16 +84,16 @@ def get_train_batch(song_list):
     return origin_batch, compare_batch, song_id_batch, is_same_batch
 
 def load_audio():
-    return mp3_to_raw_data("../fma_small/000/000211.mp3",SAMPLERATE)
+    return mp3_to_raw_data("design_diagrams/mary_start.mp3",SAMPLERATE)
 
 def plot_spectrogram(Sxx):
     Sxx = Sxx.transpose()
-    t = np.arange(Sxx.shape[1])
+    t = np.arange(Sxx.shape[1])*TIME_SEGMENT_SIZE
     f = np.arange(Sxx.shape[0])
     plt.pcolormesh(t, f, Sxx)
     #plt.imshow(Sxx, aspect='auto', cmap='hot_r', origin='lower')
-    plt.ylabel('Frequency [bins]')
-    plt.xlabel('Time [steps]')
+    plt.ylabel('Frequency [Mel bins]')
+    plt.xlabel('Time [seconds]')
     plt.show()
 
 def calc_spectrogram(raw_sound):
@@ -248,10 +248,10 @@ def train_all():
             vals = music_vectors.get_vector_values(sess)
             save_string(STANDARD_SAVE_REPO+"epoc_num.txt",str(epoc))
             result_collection.save_file(vals,epoc)
-            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc)
+            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc,write_meta_graph=False)
 
 #music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
 #print(get_train_batch(spectrify_audios(raw_data_list)))
 #compute_vectors()
-#plot_spectrogram(calc_spectrogram(load_audio()))
-train_all()
+plot_spectrogram(calc_spectrogram(load_audio()))
+#train_all()
