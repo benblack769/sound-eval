@@ -45,13 +45,15 @@ class Linearlizer:
 
     def load(self, sess, folder):
         for var in self.vars():
-            name = os.path.join(folder, var.name+".npy")
+            save_var_name = var.name[:-2]
+            name = os.path.join(folder, save_var_name+".npy")
             value = np.load(name)
             var.load(value, sess)
 
     def save(self, sess, folder):
         for var in self.vars():
+            save_var_name = var.name[:-2]
             value = sess.run(var)
-            name =  os.path.join(folder, var.name+".npy")
+            name =  os.path.join(folder, save_var_name+".npy")
             print(name)
             np.save(name, value)

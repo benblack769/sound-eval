@@ -1,7 +1,5 @@
 import numpy as np
 import random
-import matplotlib.pyplot as plt
-import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
 import os
 from WeightBias import DenseLayer
@@ -9,6 +7,7 @@ from linearlizer import Linearlizer
 
 import process_fma_files
 from file_processing import mp3_to_raw_data
+from spectrify import spectrify_audios
 
 
 CHANCE_SAME_SONG = 0.25
@@ -27,8 +26,6 @@ OUTPUT_VECTOR_SIZE = 32
 TIME_SEGMENT_SIZE = 0.1
 WINDOW_SIZE = 5
 
-LOWER_EDGE_HERTZ = 80.0
-UPPER_EDGE_HERTZ = 7600.0
 NUM_MEL_BINS = 64
 
 USE_GPU = True
@@ -105,24 +102,6 @@ def get_train_batch(song_list):
 def load_audio():
     return mp3_to_raw_data("design_diagrams/mary_start.mp3",SAMPLERATE)
 
-def plot_spectrogram(Sxx):
-    Sxx = Sxx.transpose()
-    t = np.arange(Sxx.shape[1])*TIME_SEGMENT_SIZE
-    f = np.arange(Sxx.shape[0])
-    plt.pcolormesh(t, f, Sxx)
-    #plt.imshow(Sxx, aspect='auto', cmap='hot_r', origin='lower')
-    plt.ylabel('Frequency [Mel bins]')
-    plt.xlabel('Time [seconds]')
-    plt.show()
-
-def calc_spectrogram(raw_sound):
-    signals = tf.placeholder(tf.float32, [1, None])
-    spectrogram = tf_spectrify(signals)
-    with tf.Session() as sess:
-        pow_spec_res = sess.run([spectrogram],feed_dict={
-            signals: raw_sound.reshape((1,len(raw_sound))),
-        })
-    return pow_spec_res[0][0]
 
 def save_string(filename,string):
     with open(filename,'w') as file:
@@ -132,47 +111,13 @@ def save_music_name_list(path_list):
     save_str = "\n".join([os.path.basename(path) for path in path_list])
     save_string(STANDARD_SAVE_REPO+"music_list.txt",save_str)
 
-def tf_spectrify(signals):
-    stfts = tf.contrib.signal.stft(signals, frame_length=2**11, frame_step=2**11,
-                               fft_length=2**10)
-    #power_spectrograms = tf.real(stfts * tf.conj(stfts))
-    magnitude_spectrograms = tf.abs(stfts)
+def sqr(x):
+    return x * x
 
-    num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
-    linear_to_mel_weight_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-      NUM_MEL_BINS, num_spectrogram_bins, SAMPLERATE, LOWER_EDGE_HERTZ,
-      UPPER_EDGE_HERTZ)
-    mel_spectrograms = tf.tensordot(
-      magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
-    # Note: Shape inference for <a href="../../api_docs/python/tf/tensordot"><code>tf.tensordot</code></a> does not currently handle this case.
-    # mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(
-    #  linear_to_mel_weight_matrix.shape[-1:]))`
-    log_offset = 1e-6
-    log_magnitude_spectrograms = tf.log(mel_spectrograms + log_offset)
-
-    return log_magnitude_spectrograms
-
-def spectrify_audios(audio_list):
-    signals = tf.placeholder(tf.float32, [1, None])
-    spectrogram = tf_spectrify(signals)
-
-    config = tf.ConfigProto(
-        device_count = {'GPU': int(False)}
-    )
-    with tf.Session(config=config) as sess:
-        spectrogram_list = []
-        for raw_sound in audio_list:
-            pow_spec_res = sess.run([spectrogram],feed_dict={
-                signals: raw_sound.reshape((1,len(raw_sound))),
-            })
-            spectrogram_list.append(pow_spec_res[0][0])
-
+def crop_to_smallest(spectrogram_list):
     smallest_spectrogram_len = min([len(spec) for spec in spectrogram_list])
     crop_all = [spec[:smallest_spectrogram_len] for spec in spectrogram_list]
     return np.stack(crop_all)
-
-def sqr(x):
-    return x * x
 
 def get_batch_from_var(flat_spectrified_var, spectrified_shape):
     num_time_slots = spectrified_shape[0] * spectrified_shape[1]
@@ -195,7 +140,8 @@ def get_batch_from_var(flat_spectrified_var, spectrified_shape):
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE, BASE_MUSIC_FOLDER, num_files=NUM_MUSIC_FILES)
-    spectrified_list = spectrify_audios(raw_data_list)
+    spectrified_list = spectrify_audios(raw_data_list,NUM_MEL_BINS, SAMPLERATE)
+    spectrified_list = crop_to_smallest(spectrified_list)
 
     num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
     flat_spectrified_list = spectrified_list.reshape((num_song_ids,spectrified_list.shape[2]))
