@@ -25,6 +25,7 @@ class DenseLayer:
         return res
 
     def bias_name(self):
+        print(self.name)
         return self.name+"b"
 
     def weight_name(self):

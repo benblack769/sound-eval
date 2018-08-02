@@ -1,5 +1,19 @@
 # sound-eval
 
+### Installing
+
+System libraries: ffmpeg
+
+    sudo apt-get install ffmpeg
+
+Python libraries: numpy, soundfile, tensorflow, matplotlib
+
+    pip install numpy soundfile tensorflow matplotlib
+
+### Two measures of value:
+
+1. Amount that vector updates
+2. Prediction value of music
 
 https://stackoverflow.com/questions/41711190/keras-how-to-get-the-output-of-each-layer
 

@@ -6,9 +6,9 @@ import concurrent.futures
 
 from file_processing import mp3_to_raw_data, raw_data_to_wav
 
-def get_all_music_paths():
-    find_call = "find ../../../Downloads/midiworld_mp3/ -type f"
-    file_list = subprocess.check_output(find_call.split(" ")).decode('utf-8').split()
+def get_all_music_paths(base_folder):
+    find_call = ["find", base_folder, "-type", "f"]
+    file_list = subprocess.check_output(find_call).decode('utf-8').split()
     mp3_list = [name for name in file_list if name[-4:] == ".mp3"]
     return mp3_list
 
@@ -26,8 +26,8 @@ def process_files_parallel(full_base_paths,sample_rate):
 def process_files_sequential(full_base_paths,sample_rate):
     return  [mp3_to_raw_data(file_path,sample_rate) for file_path in full_base_paths]
 
-def get_raw_data_list(sample_rate, num_files=20):
-    all_base_paths = get_all_music_paths()
+def get_raw_data_list(sample_rate, base_folder, num_files=20):
+    all_base_paths = get_all_music_paths(base_folder)
     if len(all_base_paths)  < num_files:
         print("Warning: Querrired too many files")
     print("start")

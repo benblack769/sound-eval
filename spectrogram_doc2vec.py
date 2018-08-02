@@ -1,11 +1,11 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
 import os
 from WeightBias import DenseLayer
+from linearlizer import Linearlizer
 
 import process_fma_files
 from file_processing import mp3_to_raw_data
@@ -15,10 +15,10 @@ CHANCE_SAME_SONG = 0.25
 
 SAMPLERATE = 16000
 
-TRAIN_STEPS_PER_SAVE = 20000000
+TRAIN_STEPS_PER_SAVE = 2000000
 TRAIN_STEPS_PER_PRINT = 50000
 
-NUM_MUSIC_FILES = 4897
+NUM_MUSIC_FILES = 15# 4897
 #SGD_learning_rate = 0.004
 ADAM_learning_rate = 0.001
 
@@ -36,6 +36,7 @@ USE_GPU = True
 BATCH_SIZE = 1024
 
 STANDARD_SAVE_REPO = "../non-linear-repo/"
+BASE_MUSIC_FOLDER = "../fma_small/"
 
 class OutputVectors:
     def __init__(self,num_songs,vector_size):
@@ -51,12 +52,18 @@ class OutputVectors:
     def get_vector_values(self,sess):
         return sess.run(self.all_vectors)
 
+    def load_vector_values(self,sess,values):
+        sess.run(self.all_vectors.assign(values))
+
 class ResultsTotal:
     def __init__(self,vectors_dir):
         self.vectors_dir = vectors_dir
 
     def get_filepath(self,timestep):
         return "{path}vector_at_{timestep}.npy".format(path=self.vectors_dir,timestep=timestep)
+
+    def load_file(self,timestep):
+        return np.load(self.get_filepath(timestep))
 
     def save_file(self,data,timestep):
         np.save(self.get_filepath(timestep),data)
@@ -125,8 +132,6 @@ def save_music_name_list(path_list):
     save_str = "\n".join([os.path.basename(path) for path in path_list])
     save_string(STANDARD_SAVE_REPO+"music_list.txt",save_str)
 
-
-
 def tf_spectrify(signals):
     stfts = tf.contrib.signal.stft(signals, frame_length=2**11, frame_step=2**11,
                                fft_length=2**10)
@@ -169,20 +174,6 @@ def spectrify_audios(audio_list):
 def sqr(x):
     return x * x
 
-def liniearlizer_loss(origin, cross, song_vectors, is_same):
-    HIDDEN_LEN = int(NUM_MEL_BINS*1.5)
-    origin_next = tf.nn.relu(DenseLayer('relu_origin',NUM_MEL_BINS,HIDDEN_LEN).calc_output(origin))
-    origin_vec = DenseLayer('soft_origin',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(origin_next)
-
-    cross_next = tf.nn.relu(DenseLayer('relu_cross',NUM_MEL_BINS,HIDDEN_LEN).calc_output(cross))
-    cross_vec = DenseLayer('soft_cross',HIDDEN_LEN,OUTPUT_VECTOR_SIZE).calc_output(cross_next)
-
-    input_vec = origin_vec + song_vectors
-    output_vec = cross_vec
-    logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=1)*0.1)
-    cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
-    return tf.reduce_mean(cost)
-
 def get_batch_from_var(flat_spectrified_var, spectrified_shape):
     num_time_slots = spectrified_shape[0] * spectrified_shape[1]
     base_time_slot_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=WINDOW_SIZE,maxval=num_time_slots-WINDOW_SIZE)
@@ -201,8 +192,9 @@ def get_batch_from_var(flat_spectrified_var, spectrified_shape):
     print(orign_vecs.shape)
     return orign_vecs,compare_vecs,song_ids,is_correct
 
+
 def train_all():
-    music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
+    music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE, BASE_MUSIC_FOLDER, num_files=NUM_MUSIC_FILES)
     spectrified_list = spectrify_audios(raw_data_list)
 
     num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
@@ -211,22 +203,19 @@ def train_all():
 
     music_vectors = OutputVectors(len(spectrified_list),OUTPUT_VECTOR_SIZE)
 
-    #origin_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
-    #cross_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE, NUM_MEL_BINS))
-    #song_id_batch = tf.placeholder(tf.int32, shape=(BATCH_SIZE,1))
-    #is_same_compare = tf.placeholder(tf.float32, shape=(BATCH_SIZE,))
     origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var,spectrified_list.shape)
 
     global_vectors = music_vectors.get_index_rows(song_id_batch)
 
-    loss = liniearlizer_loss(origin_compare, cross_compare, global_vectors, is_same_compare)
+    linearlizer = Linearlizer(NUM_MEL_BINS, int(NUM_MEL_BINS*1.5), OUTPUT_VECTOR_SIZE)
+
+    loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
 
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
     optimizer = tf.train.AdamOptimizer(learning_rate=ADAM_learning_rate)
     optim = optimizer.minimize(loss)
 
     result_collection = ResultsTotal(STANDARD_SAVE_REPO)
-    weight_saver = tf.train.Saver()
 
     config = tf.ConfigProto(
         device_count = {'GPU': int(USE_GPU)}
@@ -235,8 +224,11 @@ def train_all():
     with tf.Session(config=config) as sess:
         if os.path.exists(STANDARD_SAVE_REPO):
             epoc_start = int(open(STANDARD_SAVE_REPO+"epoc_num.txt").read())
-            weight_saver.restore(sess,tf.train.latest_checkpoint(STANDARD_SAVE_REPO))
             save_music_name_list(music_paths)
+            init = tf.global_variables_initializer()
+            sess.run(init)
+            linearlizer.load(sess,STANDARD_SAVE_REPO)
+            music_vectors.load_vector_values(sess,result_collection.load_file(epoc_start))
         else:
             os.makedirs(STANDARD_SAVE_REPO)
             save_music_name_list(music_paths)
@@ -244,7 +236,8 @@ def train_all():
             save_string(STANDARD_SAVE_REPO+"epoc_num.txt",str(epoc_start))
             init = tf.global_variables_initializer()
             sess.run(init)
-            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc_start)
+            linearlizer.save(sess,STANDARD_SAVE_REPO)
+            result_collection.save_file(music_vectors.get_vector_values(sess),epoc_start)
 
         train_steps = 0
         for epoc in range(epoc_start,100000000000):
@@ -257,13 +250,12 @@ def train_all():
                 train_steps += 1
                 if train_steps % (TRAIN_STEPS_PER_PRINT//BATCH_SIZE) == 0:
                     print(epoc_loss_sum/(x+1))
-            vals = music_vectors.get_vector_values(sess)
             save_string(STANDARD_SAVE_REPO+"epoc_num.txt",str(epoc))
-            result_collection.save_file(vals,epoc)
-            weight_saver.save(sess,STANDARD_SAVE_REPO+"savefile",global_step=epoc,write_meta_graph=False)
+            result_collection.save_file(music_vectors.get_vector_values(sess),epoc)
+            linearlizer.save(sess,STANDARD_SAVE_REPO)
 
 #music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
 #print(get_train_batch(spectrify_audios(raw_data_list)))
 #compute_vectors()
-plot_spectrogram(calc_spectrogram(load_audio()))
-#train_all()
+#plot_spectrogram(calc_spectrogram(load_audio()))
+train_all()
