@@ -19,13 +19,12 @@ class Linearlizer:
         self.out_cross = DenseLayer('soft_cross',hidden_size,output_size)
 
     def loss(self, origin, cross, song_vectors, is_same):
-        origin_vec = self.word_vector(origin)
+        return self.loss_vec_computed(self.word_vector(origin), self.compare_vector(cross), song_vectors, is_same)
 
-        cross_next = tf.nn.relu(self.hidden_cross.calc_output(cross))
-        cross_vec = self.out_cross.calc_output(cross_next)
+    def loss_vec_computed(self, word_vector, cross_vector, global_vector, is_same):
+        input_vec = word_vector + global_vector
+        output_vec = cross_vector
 
-        input_vec = origin_vec + song_vectors
-        output_vec = cross_vec
         logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=1)*0.1)
         cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
         return tf.reduce_mean(cost)
@@ -34,6 +33,11 @@ class Linearlizer:
         origin_next = tf.nn.relu(self.hidden_origin.calc_output(input))
         origin_vec = self.out_origin.calc_output(origin_next)
         return origin_vec
+
+    def compare_vector(self, input_cmp):
+        cross_next = tf.nn.relu(self.hidden_cross.calc_output(input_cmp))
+        cross_vec = self.out_cross.calc_output(cross_next)
+        return cross_vec
 
     def vars(self):
         return (
@@ -55,5 +59,4 @@ class Linearlizer:
             save_var_name = var.name[:-2]
             value = sess.run(var)
             name =  os.path.join(folder, save_var_name+".npy")
-            print(name)
             np.save(name, value)

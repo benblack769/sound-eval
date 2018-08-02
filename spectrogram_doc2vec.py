@@ -8,32 +8,8 @@ from linearlizer import Linearlizer
 import process_fma_files
 from file_processing import mp3_to_raw_data
 from spectrify import spectrify_audios
+from audio_config import *
 
-
-CHANCE_SAME_SONG = 0.25
-
-SAMPLERATE = 16000
-
-TRAIN_STEPS_PER_SAVE = 2000000
-TRAIN_STEPS_PER_PRINT = 50000
-
-NUM_MUSIC_FILES = 15# 4897
-#SGD_learning_rate = 0.004
-ADAM_learning_rate = 0.001
-
-OUTPUT_VECTOR_SIZE = 32
-
-TIME_SEGMENT_SIZE = 0.1
-WINDOW_SIZE = 5
-
-NUM_MEL_BINS = 64
-
-USE_GPU = True
-
-BATCH_SIZE = 1024
-
-STANDARD_SAVE_REPO = "../non-linear-repo/"
-BASE_MUSIC_FOLDER = "../fma_small/"
 
 class OutputVectors:
     def __init__(self,num_songs,vector_size):
@@ -140,7 +116,7 @@ def get_batch_from_var(flat_spectrified_var, spectrified_shape):
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE, BASE_MUSIC_FOLDER, num_files=NUM_MUSIC_FILES)
-    spectrified_list = spectrify_audios(raw_data_list,NUM_MEL_BINS, SAMPLERATE)
+    spectrified_list = spectrify_audios(raw_data_list,NUM_MEL_BINS, SAMPLERATE, TIME_SEGMENT_SIZE)
     spectrified_list = crop_to_smallest(spectrified_list)
 
     num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
@@ -153,7 +129,7 @@ def train_all():
 
     global_vectors = music_vectors.get_index_rows(song_id_batch)
 
-    linearlizer = Linearlizer(NUM_MEL_BINS, int(NUM_MEL_BINS*1.5), OUTPUT_VECTOR_SIZE)
+    linearlizer = Linearlizer(NUM_MEL_BINS, HIDDEN_SIZE, OUTPUT_VECTOR_SIZE)
 
     loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
 
