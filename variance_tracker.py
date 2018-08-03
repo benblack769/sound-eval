@@ -2,16 +2,19 @@ import numpy as np
 import random
 import tensorflow as tf
 import os
+import yaml
+import argparse
 from WeightBias import DenseLayer
 from linearlizer import Linearlizer
 import matplotlib.pyplot as plt
 from spectrify import calc_spectrogram, plot_spectrogram
 
 from file_processing import mp3_to_raw_data
-from audio_config import *
 
 SGD_learn_rate = 1
 TRACKER_BATCH_SIZE = 100
+
+config = {} # yaml config variable
 
 def plot_line(time_points,line_data,y_axis_label):
     plt.plot(time_points,line_data)
@@ -97,4 +100,23 @@ def plot_track_music_fns(mp3_path):
         plot_line(time_line, losses, "losses (cross entropy)")
 
 
-plot_track_music_fns("../fma_small/000/000997.mp3")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Calculate interesting info about an .mp3")
+    parser.add_argument('spec_output_dataset', help='Path to output folder of spectrogram_doc2vec.')
+    parser.add_argument('music_file', help='Path mp3 file to anylize.')
+    args = parser.parse_args()
+
+    config = yaml.safe_load(open(args.spec_output_dataset+"config.yaml"))
+    print(config)
+    config['STANDARD_SAVE_REPO'] = args.spec_output_dataset
+
+    SAMPLERATE = config['SAMPLERATE']
+    NUM_MEL_BINS = config['NUM_MEL_BINS']
+    TIME_SEGMENT_SIZE = config['TIME_SEGMENT_SIZE']
+    HIDDEN_SIZE = config['HIDDEN_SIZE']
+    OUTPUT_VECTOR_SIZE = config['OUTPUT_VECTOR_SIZE']
+    WINDOW_SIZE = config['WINDOW_SIZE']
+    STANDARD_SAVE_REPO = config['STANDARD_SAVE_REPO']
+
+    plot_track_music_fns(args.music_file)
