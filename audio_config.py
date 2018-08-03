@@ -23,3 +23,5 @@ BATCH_SIZE = 1024
 
 STANDARD_SAVE_REPO = "../non-linear-repo/"
 BASE_MUSIC_FOLDER = "../fma_small/"
+
+NUM_REFERENCE_VECS = 1000

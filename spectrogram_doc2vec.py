@@ -113,6 +113,14 @@ def get_batch_from_var(flat_spectrified_var, spectrified_shape):
     print(orign_vecs.shape)
     return orign_vecs,compare_vecs,song_ids,is_correct
 
+def save_reference_vecs(spectrified_list):
+    # Used by variance_tracker.py
+    if len(spectrified_list) > NUM_REFERENCE_VECS:
+        selected_list = spectrified_list[np.random.choice(len(spectrified_list),size=NUM_REFERENCE_VECS,replace=False)]
+    else:
+        selected_list = spectrified_list
+
+    np.save(STANDARD_SAVE_REPO+"reference_vecs.npy",selected_list)
 
 def train_all():
     music_paths, raw_data_list = process_fma_files.get_raw_data_list(SAMPLERATE, BASE_MUSIC_FOLDER, num_files=NUM_MUSIC_FILES)
@@ -122,6 +130,7 @@ def train_all():
     num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
     flat_spectrified_list = spectrified_list.reshape((num_song_ids,spectrified_list.shape[2]))
     flat_spectrified_var = tf.Variable(initial_value=flat_spectrified_list,trainable=False)
+    save_reference_vecs(flat_spectrified_list)
 
     music_vectors = OutputVectors(len(spectrified_list),OUTPUT_VECTOR_SIZE)
 

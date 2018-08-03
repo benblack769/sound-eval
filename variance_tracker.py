@@ -10,7 +10,8 @@ from spectrify import calc_spectrogram, plot_spectrogram
 from file_processing import mp3_to_raw_data
 from audio_config import *
 
-SGD_learn_rate = 1.0
+SGD_learn_rate = 1
+TRACKER_BATCH_SIZE = 100
 
 def plot_line(time_points,line_data,y_axis_label):
     plt.plot(time_points,line_data)
@@ -18,14 +19,15 @@ def plot_line(time_points,line_data,y_axis_label):
     plt.xlabel('Time [seconds]')
     plt.show()
 
-def make_batch_for(all_word_vecs,all_cross_vecs,timestep):
+def make_batch_for(all_word_vecs,all_cross_vecs,reference_crosses,timestep):
+    HALF_BATCH_SIZE = TRACKER_BATCH_SIZE//2
     orign_vec = all_word_vecs[timestep]
-    cross_vec_1 = all_cross_vecs[timestep-1]
-    cross_vec_2 = np.sum(all_cross_vecs,axis=0)/(len(all_cross_vecs)*1000)
+    cross_vec_1 = all_cross_vecs[np.random.choice(np.arange(-WINDOW_SIZE,WINDOW_SIZE+1),size=HALF_BATCH_SIZE,replace=True)]
+    cross_vec_2 = reference_crosses[np.random.choice(len(reference_crosses),size=HALF_BATCH_SIZE,replace=False)]
 
-    is_same = np.asarray([1,0])
-    origin = np.stack([orign_vec,orign_vec])
-    cross = np.stack([cross_vec_1,cross_vec_2])
+    is_same = np.concatenate([np.zeros(HALF_BATCH_SIZE),np.ones(HALF_BATCH_SIZE)])
+    origin = np.stack([orign_vec]*HALF_BATCH_SIZE*2)
+    cross = np.concatenate([cross_vec_1,cross_vec_2])
     return origin, cross, is_same
 
 def calc_all_vectors(calc_fn, spectrogram, sess):
@@ -34,7 +36,6 @@ def calc_all_vectors(calc_fn, spectrogram, sess):
     res = sess.run(out_vecs, feed_dict={
         audio_batch:spectrogram
     })
-    print
     return res
 
 def get_glob_diffs(glob_states):
@@ -51,15 +52,17 @@ def plot_track_music_fns(mp3_path):
     moving_glob_init = np.random.standard_normal((OUTPUT_VECTOR_SIZE)).astype('float32')/OUTPUT_VECTOR_SIZE
     moving_glob_vector = tf.Variable(moving_glob_init,name="output_vectors")
 
-    word_vec = tf.placeholder(tf.float32, shape=(2, OUTPUT_VECTOR_SIZE))
-    cmp_vec = tf.placeholder(tf.float32, shape=(2, OUTPUT_VECTOR_SIZE))
-    is_same = tf.placeholder(tf.float32, shape=(2,))
-    stacked_glob = tf.stack([moving_glob_vector,moving_glob_vector])
+    word_vec = tf.placeholder(tf.float32, shape=(TRACKER_BATCH_SIZE, OUTPUT_VECTOR_SIZE))
+    cmp_vec = tf.placeholder(tf.float32, shape=(TRACKER_BATCH_SIZE, OUTPUT_VECTOR_SIZE))
+    is_same = tf.placeholder(tf.float32, shape=(TRACKER_BATCH_SIZE,))
+    stacked_glob = tf.stack([moving_glob_vector]*TRACKER_BATCH_SIZE)
 
     loss = linearlizer.loss_vec_computed(word_vec, cmp_vec, stacked_glob, is_same)
 
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learn_rate)
     optim = optimizer.minimize(loss)
+
+    reference_vecs = np.load(STANDARD_SAVE_REPO+"reference_vecs.npy")
 
     with tf.Session() as sess:
         init = tf.global_variables_initializer()
@@ -67,16 +70,18 @@ def plot_track_music_fns(mp3_path):
         linearlizer.load(sess, STANDARD_SAVE_REPO)
         all_word_vecs = calc_all_vectors(linearlizer.word_vector,spectrogram,sess)
         all_cross_vecs = calc_all_vectors(linearlizer.compare_vector,spectrogram,sess)
+        reference_cross_vecs = calc_all_vectors(linearlizer.compare_vector,reference_vecs,sess)
         losses = []
         glob_states = []
         glob_states.append(sess.run(moving_glob_vector))
-        for step in range(1,len(all_word_vecs)-1):
-            word,cmp,same = make_batch_for(all_word_vecs,all_cross_vecs,step)
-            opt_val, loss_val = sess.run([optim,loss],feed_dict={
-                word_vec:word,
-                cmp_vec:cmp,
-                is_same:same,
-            })
+        for step in range(WINDOW_SIZE,len(all_word_vecs)-WINDOW_SIZE):
+            word,cmp,same = make_batch_for(all_word_vecs,all_cross_vecs,reference_cross_vecs,step)
+            for x in range(10):
+                opt_val, loss_val = sess.run([optim,loss],feed_dict={
+                    word_vec:word,
+                    cmp_vec:cmp,
+                    is_same:same,
+                })
             print(loss_val)
             losses.append(loss_val)
 
@@ -92,4 +97,4 @@ def plot_track_music_fns(mp3_path):
         plot_line(time_line, losses, "losses (cross entropy)")
 
 
-plot_track_music_fns("../fma_small/000/000197.mp3")
+plot_track_music_fns("../fma_small/000/000997.mp3")
