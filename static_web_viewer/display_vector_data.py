@@ -9,6 +9,7 @@ import math
 import random
 import tempfile
 import multiprocessing
+import recursive_html_indexing
 
 MP3_FOLDER = "mp3_files/"
 OUT_DATAFRAME = "all_data.csv"
@@ -157,10 +158,11 @@ if __name__ == "__main__":
     all_mp3_filepaths = read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")
 
     ordered_add_data = order_dataframe_by_filelist(add_data,all_mp3_filepaths)
-    print(ordered_add_data)
-    print(add_data)
+
     init_dirs(output_path)
 
     copy_mp3s(mp3_dataset_root,os.path.join(output_path,MP3_FOLDER),ordered_add_data.filename)
 
     save_doc_data(output_path,ordered_add_data,actual_vecs)
+
+    recursive_html_indexing.indexify_folder(output_path)
