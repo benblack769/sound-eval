@@ -1,0 +1,27 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/metrics-graphics/2.11.0/metricsgraphics.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/4.12.0/d3.min.js' charset='utf-8'></script>
+<script src="metricsgraphics.js"></script>
+<script src="math_lib.js"></script>
+<script src="template.js"></script>
+
+<body>
+    <text>Color points by: </text><select id="category_options"> </select>
+    <br>
+    <text>Select out: </text><select id="select_options"> </select>
+    <text>Select out options: </text><select id="select_out_options"> </select>
+    <br>
+    <button id="zoom_out_button">Zoom out</button>
+    <div id="data_plot"></div>
+
+    <text>Item selected: </text>
+    <text id="selected_display"></text>
+
+    <br>
+    <!--<input id="play_input_el" list="play_item">
+    <datalist id="play_item"> </datalist>-->
+    <audio controls id="audio_id">
+        <source id="audio_source" src="" type="audio/mp3">
+    </audio>
+</body>
