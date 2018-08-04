@@ -11,6 +11,9 @@ def get_all_music_paths(base_folder):
     file_list = subprocess.check_output(find_call,cwd=base_folder).decode('utf-8').strip().split()
     return file_list
 
+def filter_number(item_list, max_num):
+    return item_list[:min(len(item_list),max_num)]
+
 def get_raw_data(sample_rate, num_files=20):
     return np.concatenate(get_raw_data_list(sample_rate,num_files)[1])
 
@@ -25,7 +28,7 @@ def process_files_parallel(full_base_paths,sample_rate):
 def process_files_sequential(full_base_paths,sample_rate):
     return  [mp3_to_raw_data(file_path,sample_rate) for file_path in full_base_paths]
 
-def get_raw_data_list(sample_rate, base_folder, max_num_files=20):
+def get_raw_data_iter(sample_rate, base_folder, max_num_files=20):
     all_base_paths = get_all_music_paths(base_folder)
     #if len(all_base_paths)  < num_files:
     #    print("Warning: Querrired too many files")
@@ -33,9 +36,4 @@ def get_raw_data_list(sample_rate, base_folder, max_num_files=20):
     full_base_paths = all_base_paths[:min(max_num_files, len(all_base_paths))]
 
     rel_paths = [os.path.join(base_folder,path) for path in full_base_paths]
-    full_subfolder_data = list(process_files_parallel(rel_paths,sample_rate))
-
-    subfolder_data = [data for data in full_subfolder_data if data is not None]
-    base_paths = [path for data,path in zip(full_subfolder_data,full_base_paths) if data is not None]
-
-    return base_paths,subfolder_data
+    return process_files_parallel(rel_paths,sample_rate),full_base_paths

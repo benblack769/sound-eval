@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
 import numpy as np
+from file_processing import mp3_to_raw_data
 
 LOWER_EDGE_HERTZ = 80.0
 UPPER_EDGE_HERTZ = 7600.0
@@ -54,6 +55,11 @@ def spectrify_audios(audio_list, num_mel_bins, samplerate, time_frame_len):
             spectrogram_list.append(pow_spec_res[0][0])
 
     return spectrogram_list
+
+def calc_mp3_spectrogram(mp3_filename, num_mel_bins, samplerate, time_frame_len):
+    raw_data = mp3_to_raw_data(mp3_filename,samplerate)
+    res = None if raw_data is None else  calc_spectrogram(raw_data, num_mel_bins, samplerate, time_frame_len)
+    return res
 
 def calc_spectrogram(raw_sound, num_mel_bins, samplerate, time_frame_len):
     return spectrify_audios([raw_sound],num_mel_bins,samplerate, time_frame_len)[0]

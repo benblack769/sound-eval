@@ -6,10 +6,11 @@ import argparse
 import shutil
 from WeightBias import DenseLayer
 from linearlizer import Linearlizer
+import multiprocessing
 
 import process_many_files
 from file_processing import mp3_to_raw_data
-from spectrify import spectrify_audios
+import spectrify
 import yaml
 
 config = {} # yaml config info
@@ -97,12 +98,32 @@ def flatten_audios(spec_list):
     flattened_specs = np.concatenate(spec_list)
     return flattened_specs, start_markers, np.asarray(lens)
 
+def calc_mp3_spec(filename):
+    return spectrify.calc_mp3_spectrogram(filename, config['NUM_MEL_BINS'], config['SAMPLERATE'], config['TIME_SEGMENT_SIZE'])
+
+def process_audio_input():
+    all_filenames = process_many_files.get_all_music_paths(config['BASE_MUSIC_FOLDER'])
+    filtered_filenames = process_many_files.filter_number(all_filenames,config['MAX_NUM_FILES'])
+
+    abs_filenames = [os.path.join(config['BASE_MUSIC_FOLDER'],filename) for filename in filtered_filenames]
+
+    pool = multiprocessing.Pool()
+    spectrified_list = pool.map(calc_mp3_spec, abs_filenames)
+
+    spec_list = []
+    path_list = []
+    for spec, path in zip(spectrified_list,filtered_filenames):
+        if spec is not None:
+            spec_list.append(spec)
+            path_list.append(path)
+    return path_list, spec_list
+
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
     BATCH_SIZE = config['BATCH_SIZE']
 
-    music_paths, raw_data_list = process_many_files.get_raw_data_list(config['SAMPLERATE'], config['BASE_MUSIC_FOLDER'], max_num_files=config['MAX_NUM_FILES'])
-    spectrified_list = spectrify_audios(raw_data_list,config['NUM_MEL_BINS'], config['SAMPLERATE'], config['TIME_SEGMENT_SIZE'])
+    music_paths, spectrified_list = process_audio_input()
+    # = spectrify_audios(raw_data_list,config['NUM_MEL_BINS'], config['SAMPLERATE'], config['TIME_SEGMENT_SIZE'])
     #spectrified_list = crop_to_smallest(spectrified_list)
 
     #num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
@@ -129,7 +150,10 @@ def train_all():
 
     result_collection = ResultsTotal(SAVE_REPO)
 
-    with tf.Session() as sess:
+    gpu_config = tf.ConfigProto(
+        device_count = {'GPU': int(config['USE_GPU'])}
+    )
+    with tf.Session(config=gpu_config) as sess:
         if os.path.exists(SAVE_REPO):
             epoc_start = int(open(SAVE_REPO+"epoc_num.txt").read())
             save_music_name_list(SAVE_REPO,music_paths)

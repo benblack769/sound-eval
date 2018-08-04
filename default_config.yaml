@@ -19,3 +19,6 @@ ADAM_learning_rate: 0.001
 
 # dataset parameters
 MAX_NUM_FILES: 15
+
+# hardware parameters
+USE_GPU: False
