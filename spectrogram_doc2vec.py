@@ -48,41 +48,6 @@ class ResultsTotal:
     def clear_files(self):
         shutil.rmtree(self.vectors_dir)
 
-def find_random_comparison(song_list):
-    song_idx = random.randrange(len(song_list))
-    song_spec = song_list[song_idx]
-
-    SAME_VAL = 1
-    NOT_SAME_VAL = 0
-    is_same_val = SAME_VAL if random.random() < CHANCE_SAME_SONG else NOT_SAME_VAL
-    numpy_song_idx = np.reshape(np.int32(song_idx),(1,))
-    numpy_is_same_val = np.float32(is_same_val)
-
-    assert len(song_spec) > WINDOW_SIZE*2+1
-    choice_origin_idx = random.randrange(WINDOW_SIZE,len(song_spec)-WINDOW_SIZE)
-
-    if random.random() < CHANCE_SAME_SONG:
-        offset_idx = choice_origin_idx + random.randint(-WINDOW_SIZE,WINDOW_SIZE)
-        compare_vec = song_spec[offset_idx]
-    else:
-        other_song = random.choice(song_list)
-        other_idx = random.randrange(len(other_song))
-        compare_vec = song_spec[other_idx]
-
-    return [song_spec[choice_origin_idx],compare_vec,numpy_song_idx,numpy_is_same_val]
-
-def get_train_batch(song_list):
-    comparisons = [find_random_comparison(song_list) for _ in range(BATCH_SIZE)]
-    origin_batch = np.stack([comp[0] for comp in comparisons])
-    compare_batch = np.stack([comp[1] for comp in comparisons])
-    song_id_batch = np.stack([comp[2] for comp in comparisons])
-    is_same_batch = np.stack([comp[3] for comp in comparisons])
-    return origin_batch, compare_batch, song_id_batch, is_same_batch
-
-def load_audio():
-    return mp3_to_raw_data("design_diagrams/mary_start.mp3",SAMPLERATE)
-
-
 def save_string(filename,string):
     with open(filename,'w') as file:
         file.write(string)
@@ -90,14 +55,6 @@ def save_string(filename,string):
 def save_music_name_list(save_reop,path_list):
     save_str = "\n".join([path for path in path_list])
     save_string(save_reop+"music_list.txt",save_str)
-
-def sqr(x):
-    return x * x
-
-def crop_to_smallest(spectrogram_list):
-    smallest_spectrogram_len = min([len(spec) for spec in spectrogram_list])
-    crop_all = [spec[:smallest_spectrogram_len] for spec in spectrogram_list]
-    return np.stack(crop_all)
 
 def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, BATCH_SIZE, WINDOW_SIZE):
     num_time_slots = flat_spectrified_var.shape[0]
