@@ -180,6 +180,7 @@ def train_all():
             music_vectors.load_vector_values(sess,result_collection.load_file(epoc_start))
         else:
             os.makedirs(SAVE_REPO)
+            open(SAVE_REPO+"cost_list.csv",'w').write("epoc,cost\n")
             save_music_name_list(SAVE_REPO,music_paths)
             epoc_start = 0
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc_start))
@@ -205,6 +206,8 @@ def train_all():
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc))
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc)
             linearlizer.save(sess,SAVE_REPO)
+            open(SAVE_REPO+"cost_list.csv",'a').write("{},{}\n".format(epoc,epoc_loss_sum/(x+1)))
+
 
 #music_paths, raw_data_list = process_many_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
 #print(get_train_batch(spectrify_audios(raw_data_list)))
