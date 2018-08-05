@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
 import numpy as np
+import argparse
 from file_processing import mp3_to_raw_data
 
 LOWER_EDGE_HERTZ = 80.0
@@ -63,3 +64,24 @@ def calc_mp3_spectrogram(mp3_filename, num_mel_bins, samplerate, time_frame_len)
 
 def calc_spectrogram(raw_sound, num_mel_bins, samplerate, time_frame_len):
     return spectrify_audios([raw_sound],num_mel_bins,samplerate, time_frame_len)[0]
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Convert a mp3 encoded sound file to a spectrogram")
+    parser.add_argument('mp3_input_file', help='Path to input .mp3 file')
+    parser.add_argument('out_spec_file', help='Path to output .npy spectrogram file')
+    parser.add_argument('--mel-bins', dest='num_mel_bins', help='number of spectrogram output bins')
+    parser.add_argument('--samplerate', dest='samplerate', help='samplerate to process sound file')
+    parser.add_argument('--frame-len', dest='frame_len', help='length of each spectrogram frame')
+
+    args = parser.parse_args()
+
+    spec_out = calc_mp3_spectrogram(
+        args.mp3_input_file,
+        int(args.num_mel_bins),
+        int(args.samplerate),
+        float(args.frame_len),
+    )
+    if spec_out is None:
+        exit(1)
+    else:
+        np.save(args.out_spec_file,spec_out)

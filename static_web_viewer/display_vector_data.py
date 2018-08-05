@@ -8,6 +8,7 @@ import shutil
 import math
 import random
 import tempfile
+import json
 import multiprocessing
 import recursive_html_indexing
 
@@ -15,6 +16,7 @@ MP3_FOLDER = "mp3_files/"
 OUT_DATAFRAME = "all_data.csv"
 OUT_JSON_VIEW = "all_data.json"
 MP3_VECTOR_LIST = "mp3_vecs.npy"
+VEC_JSON = "vec_json.json"
 OUT_DATAFRAME_PART = "view_data.csv"
 OUT_JSON_PART_VIEW = "view_data.json"
 VIEWER_JSON = "template_json.js"
@@ -74,14 +76,14 @@ def calc_tsne(data):
 
 def associate_metadata(data_2d, associate_dataframe, actual_filenames):
     xvals,yvals = np.transpose(data_2d)
-    print(xvals)
-    print(actual_filenames)
+    #print(xvals)
+    #print(actual_filenames)
     val_dataframe = pandas.DataFrame(data={
         "filename":actual_filenames,
         "x":xvals,
         "y":yvals
     })
-    joined_metadata = val_dataframe.merge(associate_dataframe,on="filename",how="left",sort=True)
+    joined_metadata = val_dataframe.merge(associate_dataframe,on="filename",how="left",sort=False)
     return joined_metadata
 
 def read_file(filename):
@@ -93,18 +95,24 @@ def prepare_json_var(json_name,js_name):
     with open(js_name,'w') as js_file:
         js_file.write("var input_json_data = " + read_file(json_name))
 
-def save_doc_data(output_path,associated_data,doc_vecs):
+def save_string(filename, string):
+    with open(filename, 'w') as file:
+        file.write(string)
+
+def save_doc_data(output_path,associated_data,filenames_list,doc_vecs):
     np.save(os.path.join(output_path,MP3_VECTOR_LIST),doc_vecs)
 
     tranformed_data = calc_tsne(doc_vecs)
 
-    out_dataframe = associate_metadata(tranformed_data,associated_data,associated_data.filename)
+    out_dataframe = associate_metadata(tranformed_data,associated_data,filenames_list)
+
+    save_string(os.path.join(output_path,VEC_JSON),json.dumps(round_list_lists(doc_vecs.tolist()),separators=(',', ':')))
 
     out_dataframe.to_csv(os.path.join(output_path,OUT_DATAFRAME),index=False)
     out_dataframe.to_json(os.path.join(output_path,OUT_JSON_VIEW),orient="records")
 
     copy_view_files(output_path)
-    prepare_json_var(os.path.join(output_path,OUT_JSON_VIEW),os.path.join(output_path,VIEWER_JSON))
+    #prepare_json_var(os.path.join(output_path,OUT_JSON_VIEW),os.path.join(output_path,VIEWER_JSON))
 
 def copy_safe(src,dest):
     dir = os.path.dirname(dest)
@@ -120,6 +128,7 @@ def copy_view_files(output_path):
     source_folder = os.path.dirname(__file__)+"/"
     shutil.copyfile(source_folder+"viewer/display_template.html",os.path.join(output_path,VIEWER_HTML))
     shutil.copyfile(source_folder+"viewer/template.js",os.path.join(output_path,VIEWER_JS))
+    shutil.copyfile(source_folder+"viewer/math_lib.js",os.path.join(output_path,"math_lib.js"))
     shutil.copyfile(source_folder+"viewer/metricsgraphics.js",os.path.join(output_path,"metricsgraphics.js"))
 
 def round_list_lists(lls):
@@ -131,6 +140,7 @@ def are_unique(items):
 def order_dataframe_by_filelist(df,file_list):
     assert are_unique(file_list), "file lists must be unique"
     fdf = pandas.DataFrame({"filename":file_list})
+    df.filename = df.filename
     merged = fdf.merge(df,on=["filename"],how="left")
     return merged
 
@@ -155,14 +165,16 @@ if __name__ == "__main__":
 
     actual_vecs = np.load(vectors_path)
     add_data = pandas.read_csv(csv_path)
-    all_mp3_filepaths = read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")
+    all_mp3_filepaths = [os.path.normpath(fname) for fname in read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")]
 
-    ordered_add_data = order_dataframe_by_filelist(add_data,all_mp3_filepaths)
+    #ordered_add_data = order_dataframe_by_filelist(add_data,all_mp3_filepaths)
+    #print(add_data)
+    #print(ordered_add_data)
 
     init_dirs(output_path)
 
-    copy_mp3s(mp3_dataset_root,os.path.join(output_path,MP3_FOLDER),ordered_add_data.filename)
+    copy_mp3s(mp3_dataset_root,os.path.join(output_path,MP3_FOLDER),all_mp3_filepaths)
 
-    save_doc_data(output_path,ordered_add_data,actual_vecs)
+    save_doc_data(output_path,add_data,all_mp3_filepaths,actual_vecs)
 
     recursive_html_indexing.indexify_folder(output_path)

@@ -4,9 +4,12 @@ import tensorflow as tf
 import os
 import argparse
 import shutil
+import tempfile
 from WeightBias import DenseLayer
 from linearlizer import Linearlizer
 import multiprocessing
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 import process_many_files
 from file_processing import mp3_to_raw_data
@@ -99,7 +102,20 @@ def flatten_audios(spec_list):
     return flattened_specs, start_markers, np.asarray(lens)
 
 def calc_mp3_spec(filename):
-    return spectrify.calc_mp3_spectrogram(filename, config['NUM_MEL_BINS'], config['SAMPLERATE'], config['TIME_SEGMENT_SIZE'])
+    with tempfile.NamedTemporaryFile(suffix=".npy") as spec_file:
+        call_cmnd = ["python",
+            "spectrify.py",
+            filename,
+            spec_file.name,
+            "--mel-bins={}".format(config['NUM_MEL_BINS']),
+            "--samplerate={}".format(config['SAMPLERATE']),
+            "--frame-len={}".format(config['TIME_SEGMENT_SIZE'])
+        ]
+        retcode = subprocess.call(call_cmnd)
+        if retcode == 0:
+            return np.load(spec_file)
+        else:
+            return None
 
 def process_audio_input():
     all_filenames = process_many_files.get_all_music_paths(config['BASE_MUSIC_FOLDER'])
@@ -107,8 +123,9 @@ def process_audio_input():
 
     abs_filenames = [os.path.join(config['BASE_MUSIC_FOLDER'],filename) for filename in filtered_filenames]
 
-    pool = multiprocessing.Pool()
+    pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
     spectrified_list = pool.map(calc_mp3_spec, abs_filenames)
+    #spectrified_list = [calc_mp3_spec(filename) for filename in abs_filenames]
 
     spec_list = []
     path_list = []
