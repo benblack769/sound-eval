@@ -18,7 +18,7 @@ BATCH_SIZE: 256
 ADAM_learning_rate: 0.001
 
 # dataset parameters
-MAX_NUM_FILES: 5
+MAX_NUM_FILES: 25
 
 # hardware parameters
 USE_GPU: False

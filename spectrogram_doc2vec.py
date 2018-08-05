@@ -101,21 +101,29 @@ def flatten_audios(spec_list):
     flattened_specs = np.concatenate(spec_list)
     return flattened_specs, start_markers, np.asarray(lens)
 
-def calc_mp3_spec(filename):
-    with tempfile.NamedTemporaryFile(suffix=".npy") as spec_file:
-        call_cmnd = ["python",
-            "spectrify.py",
-            filename,
-            spec_file.name,
-            "--mel-bins={}".format(config['NUM_MEL_BINS']),
-            "--samplerate={}".format(config['SAMPLERATE']),
-            "--frame-len={}".format(config['TIME_SEGMENT_SIZE'])
-        ]
-        retcode = subprocess.call(call_cmnd)
-        if retcode == 0:
-            return np.load(spec_file)
-        else:
-            return None
+def calc_mp3_spec_batch(filenames):
+    named_temps = [tempfile.NamedTemporaryFile(suffix=".npy") for _ in range(len(filenames))]
+    call_cmnd = ["python",
+        "spectrify.py",
+        ",".join(filenames),
+        ",".join([tmp.name for tmp in named_temps]),
+        "--mel-bins={}".format(config['NUM_MEL_BINS']),
+        "--samplerate={}".format(config['SAMPLERATE']),
+        "--frame-len={}".format(config['TIME_SEGMENT_SIZE'])
+    ]
+    print(" ".join(call_cmnd))
+    subprocess.check_call(call_cmnd)
+    res = [(np.load(spec_file) if os.path.getsize(spec_file.name) > 0 else None) for spec_file in named_temps]
+    for tmp in named_temps:
+        tmp.close()
+    return res
+
+def batch_filenames(abs_filenames):
+    MP3_BATCH_SIZE = 10
+    full_size = len(abs_filenames)
+    print(list(range(0,full_size+MP3_BATCH_SIZE,MP3_BATCH_SIZE)))
+    res = [abs_filenames[i:min(i+MP3_BATCH_SIZE,full_size)] for i in range(0,full_size,MP3_BATCH_SIZE)]
+    return res
 
 def process_audio_input():
     all_filenames = process_many_files.get_all_music_paths(config['BASE_MUSIC_FOLDER'])
@@ -124,8 +132,9 @@ def process_audio_input():
     abs_filenames = [os.path.join(config['BASE_MUSIC_FOLDER'],filename) for filename in filtered_filenames]
 
     pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
-    spectrified_list = pool.map(calc_mp3_spec, abs_filenames)
-    #spectrified_list = [calc_mp3_spec(filename) for filename in abs_filenames]
+    batched_spectrified_list = pool.map(calc_mp3_spec_batch, batch_filenames(abs_filenames))
+    #batched_spectrified_list = [calc_mp3_spec_batch(filename_batch) for filename_batch in batch_filenames(abs_filenames)]
+    spectrified_list = [item for l in batched_spectrified_list for item in l]
 
     spec_list = []
     path_list = []

@@ -50,10 +50,13 @@ def spectrify_audios(audio_list, num_mel_bins, samplerate, time_frame_len):
     with tf.Session(config=config) as sess:
         spectrogram_list = []
         for raw_sound in audio_list:
-            pow_spec_res = sess.run([spectrogram],feed_dict={
-                signals: raw_sound.reshape((1,len(raw_sound))),
-            })
-            spectrogram_list.append(pow_spec_res[0][0])
+            if raw_sound is not None:
+                pow_spec_res = sess.run([spectrogram],feed_dict={
+                    signals: raw_sound.reshape((1,len(raw_sound))),
+                })
+                spectrogram_list.append(pow_spec_res[0][0])
+            else:
+                spectrogram_list.append(None)
 
     return spectrogram_list
 
@@ -67,21 +70,27 @@ def calc_spectrogram(raw_sound, num_mel_bins, samplerate, time_frame_len):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert a mp3 encoded sound file to a spectrogram")
-    parser.add_argument('mp3_input_file', help='Path to input .mp3 file')
-    parser.add_argument('out_spec_file', help='Path to output .npy spectrogram file')
+    parser.add_argument('mp3_input_files', help='Paths to input .mp3 file')
+    parser.add_argument('out_spec_files', help='Path to output .npy spectrogram file')
     parser.add_argument('--mel-bins', dest='num_mel_bins', help='number of spectrogram output bins')
     parser.add_argument('--samplerate', dest='samplerate', help='samplerate to process sound file')
     parser.add_argument('--frame-len', dest='frame_len', help='length of each spectrogram frame')
 
     args = parser.parse_args()
 
-    spec_out = calc_mp3_spectrogram(
-        args.mp3_input_file,
+    samplerate = int(args.samplerate)
+    input_fnames = args.mp3_input_files.split(",")
+    output_fnames = args.out_spec_files.split(",")
+
+    assert len(input_fnames) == len(output_fnames), "input and output lists must be same size"
+    spec_datas = [mp3_to_raw_data(mp3_filename,samplerate) for mp3_filename in input_fnames]
+
+    spec_outs = spectrify_audios(
+        spec_datas,
         int(args.num_mel_bins),
         int(args.samplerate),
         float(args.frame_len),
     )
-    if spec_out is None:
-        exit(1)
-    else:
-        np.save(args.out_spec_file,spec_out)
+    for val, filename in zip(spec_outs,output_fnames):
+        if val is not None:
+            np.save(filename,val)
