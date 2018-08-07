@@ -119,7 +119,7 @@ def calc_mp3_spec_batch(filenames):
     return res
 
 def batch_filenames(abs_filenames):
-    MP3_BATCH_SIZE = 10
+    MP3_BATCH_SIZE = 50
     full_size = len(abs_filenames)
     print(list(range(0,full_size+MP3_BATCH_SIZE,MP3_BATCH_SIZE)))
     res = [abs_filenames[i:min(i+MP3_BATCH_SIZE,full_size)] for i in range(0,full_size,MP3_BATCH_SIZE)]

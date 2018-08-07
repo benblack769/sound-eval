@@ -12,7 +12,7 @@ from spectrify import calc_spectrogram, plot_spectrogram
 from file_processing import mp3_to_raw_data
 
 SGD_learn_rate = 1
-TRACKER_BATCH_SIZE = 100
+TRACKER_BATCH_SIZE = 10
 
 config = {} # yaml config variable
 
@@ -79,7 +79,7 @@ def plot_track_music_fns(mp3_path):
         glob_states.append(sess.run(moving_glob_vector))
         for step in range(WINDOW_SIZE,len(all_word_vecs)-WINDOW_SIZE):
             word,cmp,same = make_batch_for(all_word_vecs,all_cross_vecs,reference_cross_vecs,step)
-            for x in range(10):
+            for x in range(100):
                 opt_val, loss_val = sess.run([optim,loss],feed_dict={
                     word_vec:word,
                     cmp_vec:cmp,

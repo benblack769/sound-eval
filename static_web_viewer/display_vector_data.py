@@ -173,8 +173,8 @@ if __name__ == "__main__":
 
     init_dirs(output_path)
 
-    copy_mp3s(mp3_dataset_root,os.path.join(output_path,MP3_FOLDER),all_mp3_filepaths)
-
     save_doc_data(output_path,add_data,all_mp3_filepaths,actual_vecs)
+
+    copy_mp3s(mp3_dataset_root,os.path.join(output_path,MP3_FOLDER),all_mp3_filepaths)
 
     recursive_html_indexing.indexify_folder(output_path)
