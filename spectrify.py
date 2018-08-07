@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import tensorflow.contrib.signal as tfsignal
 import tensorflow as tf
 import numpy as np
@@ -7,16 +6,6 @@ from file_processing import mp3_to_raw_data
 
 LOWER_EDGE_HERTZ = 80.0
 UPPER_EDGE_HERTZ = 7600.0
-
-def plot_spectrogram(Sxx,time_segment_size):
-    Sxx = Sxx.transpose()
-    t = np.arange(Sxx.shape[1])*time_segment_size
-    f = np.arange(Sxx.shape[0])
-    plt.pcolormesh(t, f, Sxx)
-    #plt.imshow(Sxx, aspect='auto', cmap='hot_r', origin='lower')
-    plt.ylabel('Frequency [Mel bins]')
-    plt.xlabel('Time [seconds]')
-    plt.show()
 
 def tf_spectrify(signals, num_mel_bins, samplerate, time_frame_length):
     num_frames = int(samplerate * time_frame_length)

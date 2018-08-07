@@ -1,7 +1,8 @@
 # sound evaluation parameters
 SAMPLERATE: 16000
 TIME_SEGMENT_SIZE: 0.1
-WINDOW_SIZE: 5
+WINDOW_SIZE: 3
+WINDOW_FORWARD: True
 
 # output parameters
 TRAIN_STEPS_PER_SAVE: 2000000

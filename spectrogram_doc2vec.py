@@ -84,15 +84,6 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
     print(orign_vecs.shape)
     return orign_vecs,compare_vecs,song_ids,is_correct
 
-def save_reference_vecs(save_repo,spectrified_list,max_reference_vecs):
-    # Used by variance_tracker.py
-    if len(spectrified_list) > max_reference_vecs:
-        selected_list = spectrified_list[np.random.choice(len(spectrified_list),size=max_reference_vecs,replace=False)]
-    else:
-        selected_list = spectrified_list
-
-    np.save(save_repo+"reference_vecs.npy",selected_list)
-
 def flatten_audios(spec_list):
     lens = [len(spec) for spec in spec_list]
     begin_lens = [0]+lens[:-1]
@@ -101,59 +92,17 @@ def flatten_audios(spec_list):
     flattened_specs = np.concatenate(spec_list)
     return flattened_specs, start_markers, np.asarray(lens)
 
-def calc_mp3_spec_batch(filenames):
-    named_temps = [tempfile.NamedTemporaryFile(suffix=".npy") for _ in range(len(filenames))]
-    call_cmnd = ["python",
-        "spectrify.py",
-        ",".join(filenames),
-        ",".join([tmp.name for tmp in named_temps]),
-        "--mel-bins={}".format(config['NUM_MEL_BINS']),
-        "--samplerate={}".format(config['SAMPLERATE']),
-        "--frame-len={}".format(config['TIME_SEGMENT_SIZE'])
-    ]
-    print(" ".join(call_cmnd))
-    subprocess.check_call(call_cmnd)
-    res = [(np.load(spec_file) if os.path.getsize(spec_file.name) > 0 else None) for spec_file in named_temps]
-    for tmp in named_temps:
-        tmp.close()
-    return res
-
-def batch_filenames(abs_filenames):
-    MP3_BATCH_SIZE = 50
-    full_size = len(abs_filenames)
-    print(list(range(0,full_size+MP3_BATCH_SIZE,MP3_BATCH_SIZE)))
-    res = [abs_filenames[i:min(i+MP3_BATCH_SIZE,full_size)] for i in range(0,full_size,MP3_BATCH_SIZE)]
-    return res
-
-def process_audio_input():
-    all_filenames = process_many_files.get_all_music_paths(config['BASE_MUSIC_FOLDER'])
-    filtered_filenames = process_many_files.filter_number(all_filenames,config['MAX_NUM_FILES'])
-
-    abs_filenames = [os.path.join(config['BASE_MUSIC_FOLDER'],filename) for filename in filtered_filenames]
-
-    pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
-    batched_spectrified_list = pool.map(calc_mp3_spec_batch, batch_filenames(abs_filenames))
-    #batched_spectrified_list = [calc_mp3_spec_batch(filename_batch) for filename_batch in batch_filenames(abs_filenames)]
-    spectrified_list = [item for l in batched_spectrified_list for item in l]
-
-    spec_list = []
-    path_list = []
-    for spec, path in zip(spectrified_list,filtered_filenames):
-        if spec is not None:
-            spec_list.append(spec)
-            path_list.append(path)
-    return path_list, spec_list
+def load_spec_list(base_folder):
+    all_filenames = process_many_files.get_all_paths(base_folder,"npy")
+    all_file_datas = [np.load(os.path.join(base_folder,fname)) for fname in all_filenames]
+    return all_filenames,all_file_datas
 
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
     BATCH_SIZE = config['BATCH_SIZE']
 
-    music_paths, spectrified_list = process_audio_input()
-    # = spectrify_audios(raw_data_list,config['NUM_MEL_BINS'], config['SAMPLERATE'], config['TIME_SEGMENT_SIZE'])
-    #spectrified_list = crop_to_smallest(spectrified_list)
+    music_paths, spectrified_list = load_spec_list(config['BASE_MUSIC_FOLDER'])
 
-    #num_song_ids = spectrified_list.shape[0] * spectrified_list.shape[1]
-    #flat_spectrified_list = spectrified_list.reshape((num_song_ids,spectrified_list.shape[2]))
     flat_spectrified_list, flat_start_markers, song_lens = flatten_audios(spectrified_list)
 
     tf_song_lens = tf.constant(song_lens,dtype=tf.int32)
@@ -198,7 +147,6 @@ def train_all():
             linearlizer.save(sess,SAVE_REPO)
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc_start)
 
-        save_reference_vecs(SAVE_REPO,flat_spectrified_list,config['NUM_REFERENCE_VECS'])
         shutil.copy(config['CONFIG_PATH'],SAVE_REPO+"config.yaml")
 
         train_steps = 0
@@ -223,19 +171,18 @@ def train_all():
 #compute_vectors()
 #plot_spectrogram(calc_spectrogram(load_audio()))
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Turn a folder full of .mp3 files into vectors")
-    parser.add_argument('mp3_dataset', help='Path to folder full of .mp3 files (looks recursively into subfolders for .mp3 files).')
+    parser = argparse.ArgumentParser(description="Turn a folder full of .npy identify files into document vectors")
+    parser.add_argument('vector_dataset', help='Path to folder full of .npy files (looks recursively into subfolders for .npy files).')
     parser.add_argument('output_folder', help='Path to output folder where files will be stored.')
     parser.add_argument('--config', dest='config_yaml', default="default_config.yaml",
                     help='define the .yaml config file (default is "default_config.yaml")')
     args = parser.parse_args()
 
     config = yaml.safe_load(open(args.config_yaml))
-    print(config)
+
     config['STANDARD_SAVE_REPO'] = args.output_folder
-    config['BASE_MUSIC_FOLDER'] = args.mp3_dataset
+    config['BASE_MUSIC_FOLDER'] = args.vector_dataset
     config['CONFIG_PATH'] = args.config_yaml
 
     train_all()
