@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
     actual_vecs = np.load(vectors_path)
     add_data = pandas.read_csv(csv_path)
-    all_mp3_filepaths = [os.path.normpath(fname) for fname in read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")]
+    all_mp3_filepaths = [os.path.normpath(fname)[:-4] for fname in read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")]
 
     #ordered_add_data = order_dataframe_by_filelist(add_data,all_mp3_filepaths)
     #print(add_data)

@@ -26,8 +26,15 @@ class Linearlizer:
         output_vec = cross_vector
 
         logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=1)*0.1)
-        cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
+        #cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
+        cost = tf.abs(logit_assignment - is_same)
         return tf.reduce_mean(cost)
+
+    def adj_all_weights(self, scalar):
+        updates = []
+        for var in self.vars():
+            updates.append(var.assign(var * scalar))
+        return updates
 
     def word_vector(self, input):
         origin_next = tf.nn.relu(self.hidden_origin.calc_output(input))

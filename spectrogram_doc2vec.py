@@ -70,18 +70,16 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     base_time_slot_ids = song_start_vals + add_vals_int
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE] + tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
     compare_valid_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_valid_ids))
-    compare_invalid_ids = tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=0,maxval=num_time_slots)
-    compare_ids = tf.concat([compare_valid_ids,compare_invalid_ids],axis=0)
+    compare_ids = compare_valid_ids
 
-    valid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
-    invalid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)
-    is_correct = tf.concat([valid_is_trues,invalid_is_trues],axis=0)
+    valid_is_trues = tf.ones((BATCH_SIZE,),dtype=tf.float32)
+    is_correct = valid_is_trues
 
     orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
     compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
-    print(orign_vecs.shape)
+
     return orign_vecs,compare_vecs,song_ids,is_correct
 
 def flatten_audios(spec_list):
@@ -96,6 +94,9 @@ def load_spec_list(base_folder):
     all_filenames = process_many_files.get_all_paths(base_folder,"npy")
     all_file_datas = [np.load(os.path.join(base_folder,fname)) for fname in all_filenames]
     return all_filenames,all_file_datas
+
+def loss_to_weight_adj(loss):
+    return 0.99# np.float32(1.0)/(tf.sqrt(loss)+np.float32(0.0000001))
 
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
@@ -119,9 +120,12 @@ def train_all():
 
     loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
 
-    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    SGD_learning_rate = 1.0
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
+    #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
     optim = optimizer.minimize(loss)
+
+    adj_weights_op = linearlizer.adj_all_weights(loss_to_weight_adj(loss))
 
     result_collection = ResultsTotal(SAVE_REPO)
 
@@ -154,8 +158,8 @@ def train_all():
             epoc_loss_sum = 0
             print("EPOC: {}".format(epoc))
             for x in range(config['TRAIN_STEPS_PER_SAVE']//BATCH_SIZE):
-                #print()
-                opt_res,loss_res = sess.run([optim,loss])
+
+                opt_res,loss_res,sca_update = sess.run([optim,loss,adj_weights_op])
                 epoc_loss_sum += loss_res
                 train_steps += 1
                 if train_steps % (config['TRAIN_STEPS_PER_PRINT']//BATCH_SIZE) == 0:
