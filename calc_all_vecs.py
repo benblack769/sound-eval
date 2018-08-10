@@ -17,7 +17,11 @@ def run_spec_list(spec_list,config,model_path):
     linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
 
     wordvec = linearlizer.word_vector(vecs)
-    with tf.Session() as sess:
+
+    gpu_config = tf.ConfigProto(
+        device_count = {'GPU': int(False)}
+    )
+    with tf.Session(config=gpu_config) as sess:
         linearlizer.load(sess, model_path)
         wordvecs_list = []
         for spec in spec_list:

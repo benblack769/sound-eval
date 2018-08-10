@@ -70,7 +70,7 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     base_time_slot_ids = song_start_vals + add_vals_int
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE] + tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE] + tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
     compare_valid_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_valid_ids))
     compare_ids = compare_valid_ids
 
@@ -120,9 +120,10 @@ def train_all():
 
     loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
 
-    SGD_learning_rate = 1.0
+    SGD_learning_rate = 10.0
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
     #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    #optimizer = tf.train.RMSPropOptimizer(learning_rate=config['ADAM_learning_rate'])
     optim = optimizer.minimize(loss)
 
     adj_weights_op = linearlizer.adj_all_weights(loss_to_weight_adj(loss))
