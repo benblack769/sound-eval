@@ -60,18 +60,16 @@ def save_music_name_list(save_reop,path_list):
     save_str = "\n".join([path for path in path_list])
     save_string(save_reop+"music_list.txt",save_str)
 
-def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, BATCH_SIZE, WINDOW_SIZE):
+def get_batch_from_var(flat_spectrified_var, local_vector_locs, BATCH_SIZE, WINDOW_SIZE, LOCAL_WINDOW_SIZE):
     num_time_slots = flat_spectrified_var.shape[0]
-    song_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=song_start_markers.shape[0])
-    song_start_vals = tf.gather(song_start_markers,song_ids,axis=0)
-    song_lens = tf.gather(all_song_lens,song_ids,axis=0)
-    add_vals_float = tf.cast(song_lens,dtype=tf.float32)*tf.random_uniform((BATCH_SIZE,),dtype=tf.float32,minval=0,maxval=1)
-    add_vals_int = tf.cast(add_vals_float,dtype=tf.int32)
+    local_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=local_vector_locs.shape[0])
+    local_start_vals = tf.gather(local_vector_locs,local_ids,axis=0)
+    add_vals_int = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=LOCAL_WINDOW_SIZE)
 
-    base_time_slot_ids = song_start_vals + add_vals_int
+    base_time_slot_ids = local_start_vals + add_vals_int
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
-    compare_valid_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_valid_ids))
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
+    #compare_valid_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_valid_ids))
     compare_invalid_ids = tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=0,maxval=num_time_slots)
     compare_ids = tf.concat([compare_valid_ids,compare_invalid_ids],axis=0)
 
@@ -81,8 +79,8 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
     compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
-    print(orign_vecs.shape)
-    return orign_vecs,compare_vecs,song_ids,is_correct
+
+    return orign_vecs,compare_vecs,local_ids,is_correct
 
 def flatten_audios(spec_list):
     lens = [len(spec) for spec in spec_list]
@@ -105,13 +103,14 @@ def train_all():
 
     flat_spectrified_list, flat_start_markers, song_lens = flatten_audios(spectrified_list)
 
-    tf_song_lens = tf.constant(song_lens,dtype=tf.int32)
-    tf_flat_start_markers = tf.constant(flat_start_markers,dtype=tf.int32)
     flat_spectrified_var = tf.constant(flat_spectrified_list,dtype=tf.float32)
 
-    music_vectors = OutputVectors(len(spectrified_list),config['OUTPUT_VECTOR_SIZE'])
+    num_music_vectors = len(flat_spectrified_list)//config['LOCAL_VEC_WINDOW_SIZE']
+    music_vector_locs_npy = np.random.choice(len(flat_spectrified_list)-config['LOCAL_VEC_WINDOW_SIZE']-config['WINDOW_SIZE']-1,size=num_music_vectors)
+    music_vector_locs = tf.constant(music_vector_locs_npy,dtype=np.int32)
+    music_vectors = OutputVectors(num_music_vectors,config['OUTPUT_VECTOR_SIZE'])
 
-    origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var, tf_flat_start_markers, tf_song_lens, BATCH_SIZE, config['WINDOW_SIZE'])
+    origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var, music_vector_locs, BATCH_SIZE, config['WINDOW_SIZE'], config['LOCAL_VEC_WINDOW_SIZE'])
 
     global_vectors = music_vectors.get_index_rows(song_id_batch)
 
