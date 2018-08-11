@@ -11,10 +11,8 @@ def load_spec_list(base_folder):
     all_file_datas = [np.load(os.path.join(base_folder,fname)) for fname in all_filenames]
     return all_filenames,all_file_datas
 
-def run_spec_list(spec_list,config,model_path):
+def run_spec_list(spec_list,config,model_path,linearlizer):
     vecs = tf.placeholder(tf.float32, [None, config['NUM_MEL_BINS']])
-
-    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
 
     wordvec = linearlizer.word_vector(vecs)
     with tf.Session() as sess:
@@ -26,7 +24,7 @@ def run_spec_list(spec_list,config,model_path):
             })
             wordvecs_list.append(val)
 
-        return wordvecs_list
+    return wordvecs_list
 
 def make_dirs(paths):
     for path in paths:
@@ -39,9 +37,11 @@ def calc_all_vectors(source_dir, dest_dir, model_path, config):
     source_abs_filenames = [os.path.join(source_dir,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_dir,filename) for filename in all_filenames]
 
+    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
+
     make_dirs(dest_abs_filenames)
     source_datas = [np.load(path) for path in source_abs_filenames]
-    dest_datas = run_spec_list(source_datas,config,model_path)
+    dest_datas = run_spec_list(source_datas,config,model_path,linearlizer)
     for dpath,ddata in zip(dest_abs_filenames,dest_datas):
         np.save(dpath,ddata)
 

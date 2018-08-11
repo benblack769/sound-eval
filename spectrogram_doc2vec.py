@@ -10,6 +10,7 @@ from linearlizer import Linearlizer
 import multiprocessing
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from helperclasses import OutputVectors,ResultsTotal
 
 import process_many_files
 from file_processing import mp3_to_raw_data
@@ -18,39 +19,6 @@ import yaml
 
 config = {} # yaml config info
 
-
-class OutputVectors:
-    def __init__(self,num_songs,vector_size):
-        init_val = np.random.standard_normal((num_songs,vector_size)).astype('float32')/vector_size
-
-        self.num_songs = num_songs
-        self.vector_size = vector_size
-        self.all_vectors = tf.Variable(init_val,name="output_vectors")
-
-    def get_index_rows(self,indicies):
-        return tf.reshape(tf.gather(self.all_vectors,indicies),shape=(indicies.shape[0],self.vector_size))
-
-    def get_vector_values(self,sess):
-        return sess.run(self.all_vectors)
-
-    def load_vector_values(self,sess,values):
-        sess.run(self.all_vectors.assign(values))
-
-class ResultsTotal:
-    def __init__(self,vectors_dir):
-        self.vectors_dir = vectors_dir
-
-    def get_filepath(self,timestep):
-        return "{path}vector_at_{timestep}.npy".format(path=self.vectors_dir,timestep=timestep)
-
-    def load_file(self,timestep):
-        return np.load(self.get_filepath(timestep))
-
-    def save_file(self,data,timestep):
-        np.save(self.get_filepath(timestep),data)
-
-    def clear_files(self):
-        shutil.rmtree(self.vectors_dir)
 
 def save_string(filename,string):
     with open(filename,'w') as file:
@@ -95,6 +63,20 @@ def load_spec_list(base_folder):
     all_file_datas = [np.load(os.path.join(base_folder,fname)) for fname in all_filenames]
     return all_filenames,all_file_datas
 
+def choose_local_vector_locs(desired_num_locals, max_local_val, song_start_markers):
+    all_locs = []
+    num_locs = 0
+    song_start_markers = np.concatenate([song_start_markers, np.asarray([max_local_val+1])])
+    while num_locs < desired_num_locals:
+        music_vector_locs_npy = np.random.choice(max_local_val,size=desired_num_locals-num_locs)
+        songendidxs = np.searchsorted(song_start_markers, music_vector_locs_npy, side='right')
+        will_work = song_start_markers[songendidxs] - music_vector_locs_npy > config['LOCAL_VEC_WINDOW_SIZE']
+        good_music_locs = np.extract(will_work, music_vector_locs_npy)
+        num_locs += len(good_music_locs)
+        all_locs.append(good_music_locs)
+
+    return np.concatenate(all_locs)
+
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
     BATCH_SIZE = config['BATCH_SIZE']
@@ -105,8 +87,8 @@ def train_all():
 
     flat_spectrified_var = tf.constant(flat_spectrified_list,dtype=tf.float32)
 
-    num_music_vectors = len(flat_spectrified_list)//config['LOCAL_VEC_WINDOW_SIZE']
-    music_vector_locs_npy = np.random.choice(len(flat_spectrified_list)-config['LOCAL_VEC_WINDOW_SIZE']-config['WINDOW_SIZE']-1,size=num_music_vectors)
+    num_music_vectors = config['NUM_LOCAL_VECTORS']
+    music_vector_locs_npy = choose_local_vector_locs(num_music_vectors,len(flat_spectrified_list)-config['LOCAL_VEC_WINDOW_SIZE']-config['WINDOW_SIZE']-1,flat_start_markers)
     music_vector_locs = tf.constant(music_vector_locs_npy,dtype=np.int32)
     music_vectors = OutputVectors(num_music_vectors,config['OUTPUT_VECTOR_SIZE'])
 

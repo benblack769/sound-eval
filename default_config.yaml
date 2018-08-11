@@ -3,6 +3,7 @@ SAMPLERATE: 16000
 TIME_SEGMENT_SIZE: 0.1
 WINDOW_SIZE: 5 # single directional
 LOCAL_VEC_WINDOW_SIZE: 30 # single directional
+NUM_LOCAL_VECTORS: 1000
 WINDOW_FORWARD: True
 
 # output parameters
