@@ -2,6 +2,9 @@
 SAMPLERATE: 16000
 TIME_SEGMENT_SIZE: 0.1
 WINDOW_SIZE: 5
+LOCAL_VEC_WINDOW_SIZE: 30 # single directional
+NUM_LOCAL_VECTORS: 1000
+WINDOW_FORWARD: True
 
 # output parameters
 TRAIN_STEPS_PER_SAVE: 20000000
@@ -14,7 +17,7 @@ HIDDEN_SIZE: 192
 OUTPUT_VECTOR_SIZE: 48
 
 # traning parameters
-BATCH_SIZE: 1024
+BATCH_SIZE: 512
 ADAM_learning_rate: 0.001
 
 # dataset parameters
