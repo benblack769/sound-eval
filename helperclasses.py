@@ -11,7 +11,7 @@ class OutputVectors:
         self.all_vectors = tf.Variable(init_val,name="output_vectors")
 
     def initialize(self,sess):
-        sess.run(self.all_vectors.asssign(self.init_val))
+        sess.run(self.all_vectors.assign(self.init_val))
 
     def get_index_rows(self,indicies):
         return tf.reshape(tf.gather(self.all_vectors,indicies),shape=(indicies.shape[0],self.vector_size))
