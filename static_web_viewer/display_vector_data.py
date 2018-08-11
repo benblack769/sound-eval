@@ -74,6 +74,7 @@ def calc_tsne(data):
     return transformed_data
     #print(data)
 
+
 def associate_metadata(data_2d, associate_dataframe, actual_filenames):
     xvals,yvals = np.transpose(data_2d)
     #print(xvals)
@@ -83,7 +84,9 @@ def associate_metadata(data_2d, associate_dataframe, actual_filenames):
         "x":xvals,
         "y":yvals
     })
-    joined_metadata = val_dataframe.merge(associate_dataframe,on="filename",how="left",sort=False)
+    unique_ass_data = associate_dataframe.drop_duplicates(subset="filename")
+    joined_metadata = val_dataframe.merge(unique_ass_data,on="filename",how="left",sort=False)
+
     return joined_metadata
 
 def read_file(filename):
@@ -142,6 +145,7 @@ def order_dataframe_by_filelist(df,file_list):
     fdf = pandas.DataFrame({"filename":file_list})
     df.filename = df.filename
     merged = fdf.merge(df,on=["filename"],how="left")
+    #print(len(merged.filename))
     return merged
 
 if __name__ == "__main__":
