@@ -3,7 +3,7 @@ SAMPLERATE: 16000
 TIME_SEGMENT_SIZE: 0.1
 WINDOW_SIZE: 5
 LOCAL_VEC_WINDOW_SIZE: 30 # single directional
-NUM_LOCAL_VECTORS: 1000
+NUM_LOCAL_VECTORS: 50000
 WINDOW_FORWARD: True
 
 # output parameters
@@ -24,4 +24,4 @@ ADAM_learning_rate: 0.001
 MAX_NUM_FILES: 10000
 
 # hardware parameters
-USE_GPU: True
+USE_GPU: False

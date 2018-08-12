@@ -29,7 +29,7 @@ def calc_all_compare_vecs(spec_list,config,model_path,linearlizer):
 
     return compvecs_list
 
-def get_train_batch(word_vecs,cmp_vecs,all_cmp_vecs,local_var_vecs, LOCAL_WINDOW_SIZE, WINDOW_SIZE, wordvecs_len):
+def get_train_batch(word_vecs,cmp_vecs,all_cmp_vecs, LOCAL_WINDOW_SIZE, WINDOW_SIZE, wordvecs_len):
     NUM_WORDS_PER_BATCH = 5
     local_vec_size = wordvecs_len - LOCAL_WINDOW_SIZE - WINDOW_SIZE
     half_batch_size = local_vec_size * NUM_WORDS_PER_BATCH
@@ -46,13 +46,11 @@ def get_train_batch(word_vecs,cmp_vecs,all_cmp_vecs,local_var_vecs, LOCAL_WINDOW
 
     orign_vecs = tf.gather(word_vecs,word_ids,axis=0)
 
-    local_vecs = tf.gather(local_var_vecs,local_ids,axis=0)
-
     valid_is_trues = tf.zeros((half_batch_size,),dtype=tf.float32)
     invalid_is_trues = tf.ones((half_batch_size,),dtype=tf.float32)
     is_correct = tf.concat([valid_is_trues,invalid_is_trues],axis=0)
 
-    return orign_vecs,all_cmps,local_vecs,is_correct
+    return orign_vecs,all_cmps,local_ids,is_correct
 
 def calc_all_locals(spec_list,config,model_path):
 
@@ -68,13 +66,15 @@ def calc_all_locals(spec_list,config,model_path):
     word_vecs_size = tf.placeholder(tf.int32, [])
     cur_cmp_vecs = tf.placeholder(tf.float32, [None, config['OUTPUT_VECTOR_SIZE']])
 
-    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
+    #linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
 
     max_spec_len = max(len(spec) for spec in spec_list)
 
     local_vec_var = OutputVectors(max_spec_len, config['OUTPUT_VECTOR_SIZE'])
 
-    origin_compare, cross_compare, local_vecs, is_same_compare = get_train_batch(word_vecs,cur_cmp_vecs,all_cmp_vecs_var,local_vec_var.all_vectors,config['LOCAL_VEC_WINDOW_SIZE'],config['WINDOW_SIZE'],word_vecs_size)
+    origin_compare, cross_compare, local_ids, is_same_compare = get_train_batch(word_vecs,cur_cmp_vecs,all_cmp_vecs_var,config['LOCAL_VEC_WINDOW_SIZE'],config['WINDOW_SIZE'],word_vecs_size)
+
+    local_vecs = local_vec_var.get_index_rows(local_ids)
 
     loss = linearlizer.loss_vec_computed(origin_compare, cross_compare, local_vecs, is_same_compare)
 
@@ -85,6 +85,7 @@ def calc_all_locals(spec_list,config,model_path):
 
     with tf.Session(config=gpu_config) as sess:
         sess.run(tf.global_variables_initializer())
+        linearlizer.load(sess,model_path)
         local_vecs_list = []
         for idx in range(len(spec_list)):
             local_vec_var.initialize(sess)

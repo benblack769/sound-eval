@@ -14,7 +14,7 @@ class OutputVectors:
         sess.run(self.all_vectors.assign(self.init_val))
 
     def get_index_rows(self,indicies):
-        return tf.reshape(tf.gather(self.all_vectors,indicies),shape=(indicies.shape[0],self.vector_size))
+        return tf.gather(self.all_vectors,indicies,axis=0)#,shape=(indicies.shape[0],self.vector_size))
 
     def get_vector_values(self,sess):
         return sess.run(self.all_vectors)
