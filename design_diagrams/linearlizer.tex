@@ -127,21 +127,30 @@ The neural network algorithm looks like this:
 With input vectors, $I_1, I_2$, and seperate, but identical multi-layer networks 1 and 2, 	
 
 \begin{tikzpicture}[]
+\node at (0,8) [draw] (songid) {Song ID};
+\draw[step=0.3cm] (2.4,6.0) grid (2.7,10.2)  node[anchor=south] {Song vector};
+\draw[thick,->] (1,8) -- (2,8);
 
-\node at (0,2) [rect, draw]   (ti1) {$I_{t1}$};
-\node at (4,2) [rect, draw]   (tv1) {$V_{t1}$};
-\node at (0,0) [rect, draw]   (ti2) {$I_{t2}$};
-\node at (4,0) [rect, draw]   (tv2) {$V_{t2}$};
-\node at (6,1) [circle, draw]   (dot) {dot};
-\node at (9,1) [rect, draw]   (approx) {Approximate distance};
-
-\path[every node/.style={font=\sffamily\footnotesize}]
-(ti1) [->] edge node [] {Multi-layer-network 1} (tv1)
-(ti2) [->] edge node [] {Multi-layer-network 2} (tv2)
-(tv1) [->] edge node [] {} (dot)
-(tv2) [->] edge node [] {} (dot)
-(dot) [->] edge node [] {} (approx);
+\node at (0,2) [draw] (songid) {Song ID};
+\draw[step=0.3cm] (2.4,0) grid (2.7,4.2)  node[anchor=south] {Song vector};
+\draw[thick,->] (1,2) -- (2,2);
 \end{tikzpicture}
+
+%\begin{tikzpicture}[]
+%\node at (0,2) [draw]   (ti1) {$I_{t1}$};
+%\node at (4,2) [draw]   (tv1) {$V_{t1}$};
+%\node at (0,0) [draw]   (ti2) {$I_{t2}$};
+%\node at (4,0) [draw]   (tv2) {$V_{t2}$};
+%\node at (6,1) [circle, draw]   (dot) {dot};
+%\node at (9,1) [draw]   (approx) {Approximate distance};
+%
+%\path[every node/.style={font=\sffamily\footnotesize}]
+%(ti1) [->] edge node [] {Multi-layer-network 1} (tv1)
+%(ti2) [->] edge node [] {Multi-layer-network 2} (tv2)
+%(tv1) [->] edge node [] {} (dot)
+%(tv2) [->] edge node [] {} (dot)
+%(dot) [->] edge node [] {} (approx);
+%\end{tikzpicture}
 
 
 The neural network is given the task of approximating the following distance function. 

@@ -78,9 +78,9 @@ def calc_all_locals(spec_list,config,model_path):
 
     loss = linearlizer.loss_vec_computed(origin_compare, cross_compare, local_vecs, is_same_compare)
 
-    SGD_learning_rate = 10.0
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    SGD_learning_rate = 5.0
+    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
     optim = optimizer.minimize(loss)
 
     with tf.Session(config=gpu_config) as sess:
@@ -88,13 +88,16 @@ def calc_all_locals(spec_list,config,model_path):
         linearlizer.load(sess,model_path)
         local_vecs_list = []
         for idx in range(len(spec_list)):
+            if len(all_cmp_vecs_np[idx]) < config['LOCAL_VEC_WINDOW_SIZE'] + config['WINDOW_SIZE'] + 10:
+                continue
             local_vec_var.initialize(sess)
-            for x in range(100):
+            for x in range(400):
                 opt_val, loss_val = sess.run([optim, loss],feed_dict={
-                    word_vecs:all_word_vecs[idx],
+                    word_vecs:np.zeros(all_cmp_vecs_np[idx].shape),#all_word_vecs[idx],
                     cur_cmp_vecs:all_cmp_vecs_np[idx],
-                    word_vecs_size:len(all_word_vecs[idx])
+                    word_vecs_size:len(all_cmp_vecs_np[idx])
                 })
+
             print(loss_val)
             print("new vec calculated")
             local_var_len = len(all_word_vecs[idx]) - config['LOCAL_VEC_WINDOW_SIZE'] - config['WINDOW_SIZE']
@@ -113,7 +116,7 @@ def make_dirs(paths):
 def calc_all_vectors(source_dir, dest_dir, model_path, config):
     all_filenames = process_many_files.get_all_paths(source_dir,"npy")
     random.shuffle(all_filenames)
-    all_filenames = all_filenames[:10]
+    #all_filenames = all_filenames[:50]
     source_abs_filenames = [os.path.join(source_dir,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_dir,filename) for filename in all_filenames]
 

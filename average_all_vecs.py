@@ -18,7 +18,9 @@ def sum_single(src_data, sum_over):
     drop_len = (len(src_data)//sum_over)*sum_over
     dropped_data = src_data[:drop_len]
     reshaped_data = np.reshape(dropped_data,(drop_len//sum_over,sum_over,src_data.shape[1]))
-    summed_data = 
+    summed_data = np.mean(reshaped_data,axis=1)
+
+    return summed_data
 
 def calc_all_vectors(source_dir, dest_dir, sum_over):
     all_filenames = process_many_files.get_all_paths(source_dir,"npy")
@@ -34,7 +36,7 @@ def calc_all_vectors(source_dir, dest_dir, sum_over):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Turn a folder full of .npy identify files into a folder of .npy vector files")
     parser.add_argument('vector_dataset', help='Path to folder full of .npy files (looks recursively into subfolders for .npy files).')
-    parser.add_argument('--sum_over', target="sum_amnt" help='Path to learning model folder.')
+    parser.add_argument('--sum_over', dest="sum_amnt", type=int, help='Path to learning model folder.')
     parser.add_argument('output_folder', help='Path to output folder where files will be stored.')
 
     args = parser.parse_args()
