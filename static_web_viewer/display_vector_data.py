@@ -118,10 +118,11 @@ def save_doc_data(output_path,associated_data,filenames_list,doc_vecs):
     #prepare_json_var(os.path.join(output_path,OUT_JSON_VIEW),os.path.join(output_path,VIEWER_JSON))
 
 def copy_safe(src,dest):
-    dir = os.path.dirname(dest)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    shutil.copy(src,dest)
+    if os.path.exists(src):
+        dir = os.path.dirname(dest)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        shutil.copy(src,dest)
 
 def copy_mp3s(mp3_base_filepath, output_paths, copy_paths):
     for item in copy_paths:
