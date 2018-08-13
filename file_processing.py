@@ -5,6 +5,13 @@ import subprocess
 import io
 import tempfile
 
+def wav_to_raw_data(filename, samplerate):
+    sig, out_samplerate = sf.read(filename)
+    assert out_samplerate == samplerate
+    sig_float = sig.astype(np.float32)
+    sig_vec = sig_float.sum(axis=1) / sig_float.shape[1] if len(sig_float.shape) > 1 else sig_float
+    return sig_vec
+
 def mp3_to_raw_data(filename, samplerate):
     '''
     parameters: - filename of mp3 file

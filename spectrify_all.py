@@ -35,7 +35,8 @@ def make_dirs(paths):
             os.makedirs(pathdir)
 
 def process_audio_folder(source_folder, dest_folder, config):
-    all_filenames = process_many_files.get_all_paths(source_folder,"mp3")
+    all_filenames = (process_many_files.get_all_paths(source_folder,"mp3") +
+        process_many_files.get_all_paths(source_folder,"wav"))
 
     source_abs_filenames = [os.path.join(source_folder,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_folder,filename) for filename in all_filenames]
