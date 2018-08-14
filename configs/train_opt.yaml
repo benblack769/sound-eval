@@ -1,7 +1,7 @@
 # sound evaluation parameters
 SAMPLERATE: 44100
 TIME_SEGMENT_SIZE: 0.1
-WINDOW_SIZE: 5
+WINDOW_SIZE: 4
 
 # output parameters
 TRAIN_STEPS_PER_SAVE: 20000000
@@ -21,4 +21,4 @@ ADAM_learning_rate: 0.001
 MAX_NUM_FILES: 10000
 
 # hardware parameters
-USE_GPU: True
+USE_GPU: False
