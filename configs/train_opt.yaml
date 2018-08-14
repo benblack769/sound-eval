@@ -1,5 +1,5 @@
 # sound evaluation parameters
-SAMPLERATE: 16000
+SAMPLERATE: 44100
 TIME_SEGMENT_SIZE: 0.1
 WINDOW_SIZE: 5
 LOCAL_VEC_WINDOW_SIZE: 30 # single directional

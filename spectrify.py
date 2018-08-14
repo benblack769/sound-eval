@@ -49,17 +49,15 @@ def spectrify_audios(audio_list, num_mel_bins, samplerate, time_frame_len):
 
     return spectrogram_list
 
-def calc_mp3_spectrogram(mp3_filename, num_mel_bins, samplerate, time_frame_len):
-    ext = mp3_filename.split(".")[-1]
-    if ext  == "mp3":
-        raw_data = mp3_to_raw_data(mp3_filename,samplerate)
-    elif ext == "wav":
-        raw-data = wav_to_raw_data(mp3_filename,samplerate)
-    res = None if raw_data is None else  calc_spectrogram(raw_data, num_mel_bins, samplerate, time_frame_len)
-    return res
 
-def calc_spectrogram(raw_sound, num_mel_bins, samplerate, time_frame_len):
-    return spectrify_audios([raw_sound],num_mel_bins,samplerate, time_frame_len)[0]
+def load_data(filename,samplerate):
+    ext = filename.split(".")[-1]
+    if ext  == "mp3":
+        return mp3_to_raw_data(filename,samplerate)
+    elif ext == "wav":
+        return wav_to_raw_data(filename,samplerate)
+    else:
+        return None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert a mp3 encoded sound file to a spectrogram")
@@ -76,7 +74,7 @@ if __name__ == "__main__":
     output_fnames = args.out_spec_files.split(",")
 
     assert len(input_fnames) == len(output_fnames), "input and output lists must be same size"
-    spec_datas = [mp3_to_raw_data(mp3_filename,samplerate) for mp3_filename in input_fnames]
+    spec_datas = [load_data(filename,samplerate) for filename in input_fnames]
 
     spec_outs = spectrify_audios(
         spec_datas,
