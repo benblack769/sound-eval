@@ -1,9 +1,10 @@
 import argparse
 import pandas
 import numpy as np
-from keras.models import Sequential
-from keras.layers import Dense, Activation
+#from keras.models import Sequential
+#from keras.layers import Dense, Activation
 import sklearn.linear_model
+from sklearn import svm    			# To fit the svm classifier\
 
 PROPORTION_TEST = 0.2
 
@@ -44,7 +45,7 @@ class SoftmaxFitter:
             #Dense(self.OUT_LEN),
             Activation('softmax'),
         ])
-        self.model.compile(optimizer='adam',
+        self.model.compile(optimizer='rmsprop',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
         self.model.fit(inputs,one_shot_vec(expected,self.OUT_LEN),epochs=50,batch_size=32)
@@ -58,7 +59,8 @@ class SoftmaxFitter:
 
 def calc_logit_regress_stats(inputs,outputs):
     (train_inputs,train_outputs),(test_inputs,test_outputs) = get_test_train(inputs,outputs)
-    logit_model = SoftmaxFitter()
+    #logit_model = SoftmaxFitter()
+    logit_model = svm.SVC(kernel='linear')
     logit_model.fit(train_inputs,train_outputs)
     prediction = logit_model.predict(test_inputs)
 
