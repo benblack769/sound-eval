@@ -65,7 +65,10 @@ def get_random_ints_based_on_lens(lens,batch_size):
     res_int = tf.cast(res_float,dtype=tf.int32)
     return res_int
 
-def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, BATCH_SIZE, WINDOW_SIZE):
+def sqr(x):
+    return x * x
+
+def get_loss_from_var(flat_spectrified_var, song_start_markers, all_song_lens, linearlizer, all_song_vecs, BATCH_SIZE, WINDOW_SIZE):
     num_time_slots = flat_spectrified_var.shape[0]
     song_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=song_start_markers.shape[0])
     song_start_vals = tf.gather(song_start_markers,song_ids,axis=0)
@@ -73,20 +76,33 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     base_time_slot_ids = song_start_vals + get_random_ints_based_on_lens(song_lens,BATCH_SIZE)
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
-    compare_local_invalid_ids = base_time_slot_ids[BATCH_SIZE//2:(3*BATCH_SIZE)//4]  + get_random_ints_based_on_lens(song_lens[BATCH_SIZE//2:(3*BATCH_SIZE)//4],BATCH_SIZE//4)
-    compare_global_invalid_ids = tf.random_uniform((BATCH_SIZE//4,),dtype=tf.int32,minval=0,maxval=num_time_slots)
-    compare_ids = tf.concat([compare_valid_ids,compare_local_invalid_ids,compare_global_invalid_ids],axis=0)
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
+    compare_global_invalid_ids = tf.random_uniform(((BATCH_SIZE*3)//8,),dtype=tf.int32,minval=0,maxval=num_time_slots)
+    compare_ids = tf.concat([compare_valid_ids,compare_global_invalid_ids],axis=0)
     compare_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_ids))
 
-    valid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
-    invalid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)
+    valid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)
+    invalid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
     is_correct = tf.concat([valid_is_trues,invalid_is_trues],axis=0)
 
     orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
     compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
-    print(orign_vecs.shape)
-    return orign_vecs,compare_vecs,song_ids,is_correct
+
+    assert BATCH_SIZE % 4 == 0
+
+    word_vecs = linearlizer.word_vector(orign_vecs)
+    norm_cross_vecs = linearlizer.compare_vector(compare_vecs)
+
+    pred_cross_vecs = linearlizer.compare_vector_pred(orign_vecs[(7*BATCH_SIZE)//8:])
+    all_cross_vecs = tf.concat([norm_cross_vecs,tf.stop_gradient(pred_cross_vecs)],axis=0)
+
+    song_vecs = tf.gather(all_song_vecs,song_ids,axis=0)
+
+    classify_loss = linearlizer.loss_vec_computed(word_vecs,all_cross_vecs,song_vecs,is_correct)
+
+    predict_loss = tf.reduce_mean(sqr(linearlizer.compare_vector_pred(orign_vecs[:BATCH_SIZE//2]) - tf.stop_gradient(norm_cross_vecs[:BATCH_SIZE//2])))
+
+    return classify_loss, predict_loss
 
 def flatten_audios(spec_list):
     lens = [len(spec) for spec in spec_list]
@@ -115,17 +131,15 @@ def train_all():
 
     music_vectors = OutputVectors(len(spectrified_list),config['OUTPUT_VECTOR_SIZE'])
 
-    origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var, tf_flat_start_markers, tf_song_lens, BATCH_SIZE, config['WINDOW_SIZE'])
-
-    global_vectors = music_vectors.get_index_rows(song_id_batch)
-
     linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
 
-    loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
+    classify_loss, predict_loss = get_loss_from_var(flat_spectrified_var, tf_flat_start_markers, tf_song_lens, linearlizer, music_vectors.all_vectors, BATCH_SIZE, config['WINDOW_SIZE'])
 
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
     optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
-    optim = optimizer.minimize(loss)
+    #optimizer = tf.train.MomentumOptimizer()
+    class_optim = optimizer.minimize(classify_loss)
+    pred_optim = optimizer.minimize(predict_loss)
 
     result_collection = ResultsTotal(SAVE_REPO)
 
@@ -142,7 +156,7 @@ def train_all():
             music_vectors.load_vector_values(sess,result_collection.load_file(epoc_start))
         else:
             os.makedirs(SAVE_REPO)
-            open(SAVE_REPO+"cost_list.csv",'w').write("epoc,cost\n")
+            open(SAVE_REPO+"cost_list.csv",'w').write("epoc,class_cost,pred_cost\n")
             save_music_name_list(SAVE_REPO,music_paths)
             epoc_start = 0
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc_start))
@@ -154,20 +168,23 @@ def train_all():
         shutil.copy(config['CONFIG_PATH'],SAVE_REPO+"config.yaml")
 
         train_steps = 0
-        for epoc in range(epoc_start,100000000000):
-            epoc_loss_sum = 0
+        for epoc in range(epoc_start,20):
+            epoc_class_loss_sum = 0
+            epoc_pred_loss_sum = 0
             print("EPOC: {}".format(epoc))
             for x in range(config['TRAIN_STEPS_PER_SAVE']//BATCH_SIZE):
                 #print()
-                opt_res,loss_res = sess.run([optim,loss])
-                epoc_loss_sum += loss_res
+                opt_res,class_loss_res = sess.run([class_optim,classify_loss])
+                epoc_class_loss_sum += class_loss_res
+                epoc_pred_loss_sum += pred_loss_res
                 train_steps += 1
                 if train_steps % (config['TRAIN_STEPS_PER_PRINT']//BATCH_SIZE) == 0:
-                    print(epoc_loss_sum/(x+1))
+                    print(epoc_class_loss_sum/(x+1),"\t",epoc_pred_loss_sum/(x+1))
+            for x in range()
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc))
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc)
             linearlizer.save(sess,SAVE_REPO)
-            open(SAVE_REPO+"cost_list.csv",'a').write("{},{}\n".format(epoc,epoc_loss_sum/(x+1)))
+            open(SAVE_REPO+"cost_list.csv",'a').write("{},{},{}\n".format(epoc,epoc_class_loss_sum/(x+1),epoc_pred_loss_sum/(x+1)))
 
 
 #music_paths, raw_data_list = process_many_files.get_raw_data_list(SAMPLERATE,num_files=NUM_MUSIC_FILES)
