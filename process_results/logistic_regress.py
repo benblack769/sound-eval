@@ -48,7 +48,7 @@ class SoftmaxFitter:
         self.model.compile(optimizer='rmsprop',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
-        self.model.fit(inputs,one_shot_vec(expected,self.OUT_LEN),epochs=50,batch_size=32)
+        self.model.fit(inputs,one_shot_vec(expected,self.OUT_LEN),epochs=100,batch_size=32)
 
     def predict(self, inputs):
         return self.model.predict_classes(inputs)
@@ -76,9 +76,9 @@ def calc_logit_regress_stats(inputs,outputs):
 
 def run_stats(doc_csv,doc_vecs):
     new_doc_vecs = np.concatenate([np.maximum(doc_vecs,0),np.maximum(-doc_vecs,0)],axis=1)
-    #result = doc_csv['class'] == "drilling"
+    #result = doc_csv['classID']# == "drilling"
     result = doc_csv['target']
-    calc_logit_regress_stats(new_doc_vecs,result)
+    calc_logit_regress_stats(doc_vecs,result)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Collect document statistics")
