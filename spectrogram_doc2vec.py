@@ -60,20 +60,24 @@ def save_music_name_list(save_reop,path_list):
     save_str = "\n".join([path for path in path_list])
     save_string(save_reop+"music_list.txt",save_str)
 
+def get_random_ints_based_on_lens(lens,batch_size):
+    res_float = tf.cast(lens,dtype=tf.float32)*tf.random_uniform((batch_size,),dtype=tf.float32,minval=0,maxval=1)
+    res_int = tf.cast(res_float,dtype=tf.int32)
+    return res_int
+
 def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, BATCH_SIZE, WINDOW_SIZE):
     num_time_slots = flat_spectrified_var.shape[0]
     song_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=song_start_markers.shape[0])
     song_start_vals = tf.gather(song_start_markers,song_ids,axis=0)
     song_lens = tf.gather(all_song_lens,song_ids,axis=0)
-    add_vals_float = tf.cast(song_lens,dtype=tf.float32)*tf.random_uniform((BATCH_SIZE,),dtype=tf.float32,minval=0,maxval=1)
-    add_vals_int = tf.cast(add_vals_float,dtype=tf.int32)
 
-    base_time_slot_ids = song_start_vals + add_vals_int
+    base_time_slot_ids = song_start_vals + get_random_ints_based_on_lens(song_lens,BATCH_SIZE)
 
     compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
-    compare_valid_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_valid_ids))
-    compare_invalid_ids = tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=0,maxval=num_time_slots)
-    compare_ids = tf.concat([compare_valid_ids,compare_invalid_ids],axis=0)
+    compare_local_invalid_ids = base_time_slot_ids[BATCH_SIZE//2:(3*BATCH_SIZE)//4]  + get_random_ints_based_on_lens(song_lens[BATCH_SIZE//2:(3*BATCH_SIZE)//4],BATCH_SIZE//4)
+    compare_global_invalid_ids = tf.random_uniform((BATCH_SIZE//4,),dtype=tf.int32,minval=0,maxval=num_time_slots)
+    compare_ids = tf.concat([compare_valid_ids,compare_local_invalid_ids,compare_global_invalid_ids],axis=0)
+    compare_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_ids))
 
     valid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
     invalid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)

@@ -14,7 +14,7 @@ HIDDEN_SIZE: 192
 OUTPUT_VECTOR_SIZE: 48
 
 # traning parameters
-BATCH_SIZE: 1024
+BATCH_SIZE: 1024 # must be a multiple of 4
 ADAM_learning_rate: 0.001
 
 # dataset parameters

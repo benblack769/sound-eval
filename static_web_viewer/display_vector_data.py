@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
     final_epoc = read_file(os.path.join(proc_path,"epoc_num.txt"))
 
-    vectors_path = os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
+    vectors_path = "arg.npy"#os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
     csv_path = args.dataset_csv
 
     actual_vecs = np.load(vectors_path)
