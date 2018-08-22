@@ -73,8 +73,9 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     base_time_slot_ids = song_start_vals + get_random_ints_based_on_lens(song_lens,BATCH_SIZE)
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_SIZE,maxval=WINDOW_SIZE+1)
-    compare_local_invalid_ids = base_time_slot_ids[BATCH_SIZE//2:(3*BATCH_SIZE)//4]  + get_random_ints_based_on_lens(song_lens[BATCH_SIZE//2:(3*BATCH_SIZE)//4],BATCH_SIZE//4)
+    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
+    compare_local_invalid_ids = base_time_slot_ids[BATCH_SIZE//2:(3*BATCH_SIZE)//4] + get_random_ints_based_on_lens(song_lens[BATCH_SIZE//2:(3*BATCH_SIZE)//4],BATCH_SIZE//4)
+    #compare_prev_invalid_ids = base_time_slot_ids[(5*BATCH_SIZE)//8:(3*BATCH_SIZE)//4] - tf.random_uniform((BATCH_SIZE//8,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE*2+1)
     compare_global_invalid_ids = tf.random_uniform((BATCH_SIZE//4,),dtype=tf.int32,minval=0,maxval=num_time_slots)
     compare_ids = tf.concat([compare_valid_ids,compare_local_invalid_ids,compare_global_invalid_ids],axis=0)
     compare_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_ids))
@@ -85,7 +86,7 @@ def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, 
 
     orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
     compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
-    print(orign_vecs.shape)
+
     return orign_vecs,compare_vecs,song_ids,is_correct
 
 def flatten_audios(spec_list):

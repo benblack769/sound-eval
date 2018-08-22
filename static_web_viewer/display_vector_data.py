@@ -155,6 +155,8 @@ if __name__ == "__main__":
     parser.add_argument('mp3_dataset_root', help='Path to folder full of .mp3 files (needs to be the same structure as the folder that spectrogram doc2vec processed)')
     parser.add_argument('dataset_csv', help='Path to csv file with associated data of dataset')
     parser.add_argument('output_folder', help='Path to static website output')
+    parser.add_argument('--vectors_npy', dest='vectors_fname', default="default",
+                help='override npy vectors to use as base vectors')
 
     args = parser.parse_args()
 
@@ -165,7 +167,7 @@ if __name__ == "__main__":
 
     final_epoc = read_file(os.path.join(proc_path,"epoc_num.txt"))
 
-    vectors_path = "arg.npy"#os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
+    vectors_path = args.vectors_fname if args.vectors_fname != "default" else os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
     csv_path = args.dataset_csv
 
     actual_vecs = np.load(vectors_path)
