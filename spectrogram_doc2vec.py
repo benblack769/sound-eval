@@ -12,7 +12,6 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 import process_many_files
-from file_processing import mp3_to_raw_data
 import spectrify
 import yaml
 
@@ -28,7 +27,7 @@ class OutputVectors:
         self.all_vectors = tf.Variable(init_val,name="output_vectors")
 
     def get_index_rows(self,indicies):
-        return tf.reshape(tf.gather(self.all_vectors,indicies),shape=(indicies.shape[0],self.vector_size))
+        return tf.gather(self.all_vectors,indicies,axis=0)
 
     def get_vector_values(self,sess):
         return sess.run(self.all_vectors)
@@ -60,69 +59,115 @@ def save_music_name_list(save_reop,path_list):
     save_str = "\n".join([path for path in path_list])
     save_string(save_reop+"music_list.txt",save_str)
 
-def get_random_ints_based_on_lens(lens,batch_size):
-    res_float = tf.cast(lens,dtype=tf.float32)*tf.random_uniform((batch_size,),dtype=tf.float32,minval=0,maxval=1)
-    res_int = tf.cast(res_float,dtype=tf.int32)
-    return res_int
+def get_batch_from_var(word_vecs, song_idx, config):
+    STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
+    STEPS_BETWEEN_WINDOWS = config['STEPS_BETWEEN_WINDOWS']
+    INVALID_BEFORE_RANGE_START = config['INVALID_BEFORE_RANGE_START']
+    WINDOW_GAP_RANGE = config['WINDOW_GAP_RANGE']
+    INVALID_BEFORE_RANGE_VAR = config['INVALID_BEFORE_RANGE_VAR']
+    BATCH_SIZE = config['SAMPLES_PER_SONG']
 
-def get_batch_from_var(flat_spectrified_var, song_start_markers, all_song_lens, BATCH_SIZE, WINDOW_SIZE):
-    num_time_slots = flat_spectrified_var.shape[0]
-    song_ids = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=0,maxval=song_start_markers.shape[0])
-    song_start_vals = tf.gather(song_start_markers,song_ids,axis=0)
-    song_lens = tf.gather(all_song_lens,song_ids,axis=0)
+    word_vecs = word_vecs#[0]
+    word_vec_len = tf.shape(word_vecs)[0]
 
-    base_time_slot_ids = song_start_vals + get_random_ints_based_on_lens(song_lens,BATCH_SIZE)
+    START_LOC = INVALID_BEFORE_RANGE_START + INVALID_BEFORE_RANGE_VAR + STEPS_IN_WINDOW
+    END_LOC = word_vec_len - (STEPS_IN_WINDOW*2 + STEPS_BETWEEN_WINDOWS + WINDOW_GAP_RANGE)
+    origin_starts = tf.random_uniform((BATCH_SIZE,1),dtype=tf.int32,minval=START_LOC,maxval=END_LOC)
+    valid_compare_starts = origin_starts[:BATCH_SIZE//2] + (STEPS_IN_WINDOW + STEPS_BETWEEN_WINDOWS) + tf.random_uniform((BATCH_SIZE//2,1),dtype=tf.int32,minval=-WINDOW_GAP_RANGE,maxval=WINDOW_GAP_RANGE+1)
+    invalid_compare_start = origin_starts[BATCH_SIZE//2:] + (- STEPS_IN_WINDOW - INVALID_BEFORE_RANGE_START) - tf.random_uniform((BATCH_SIZE//2,1),dtype=tf.int32,minval=0,maxval=INVALID_BEFORE_RANGE_VAR)
+    all_compare_starts = tf.concat([valid_compare_starts,invalid_compare_start],axis=0)
 
-    compare_valid_ids = base_time_slot_ids[:BATCH_SIZE//2] + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE+1)
-    compare_local_invalid_ids = base_time_slot_ids[BATCH_SIZE//2:(3*BATCH_SIZE)//4] + get_random_ints_based_on_lens(song_lens[BATCH_SIZE//2:(3*BATCH_SIZE)//4],BATCH_SIZE//4)
-    #compare_prev_invalid_ids = base_time_slot_ids[(5*BATCH_SIZE)//8:(3*BATCH_SIZE)//4] - tf.random_uniform((BATCH_SIZE//8,),dtype=tf.int32,minval=1,maxval=WINDOW_SIZE*2+1)
-    compare_global_invalid_ids = tf.random_uniform((BATCH_SIZE//4,),dtype=tf.int32,minval=0,maxval=num_time_slots)
-    compare_ids = tf.concat([compare_valid_ids,compare_local_invalid_ids,compare_global_invalid_ids],axis=0)
-    compare_ids = tf.maximum(np.int32(0),tf.minimum(num_time_slots-1,compare_ids))
+    arange = tf.range(STEPS_IN_WINDOW)
+    tiled_origin_starts = tf.tile(origin_starts,(1,STEPS_IN_WINDOW)) + arange
+    tiled_compare_starts = tf.tile(all_compare_starts,(1,STEPS_IN_WINDOW)) + arange
+
+    origins = tf.gather(word_vecs, tiled_origin_starts,axis=0)
+    compares = tf.gather(word_vecs, tiled_compare_starts,axis=0)
 
     valid_is_trues = tf.zeros((BATCH_SIZE//2,),dtype=tf.float32)
     invalid_is_trues = tf.ones((BATCH_SIZE//2,),dtype=tf.float32)
     is_correct = tf.concat([valid_is_trues,invalid_is_trues],axis=0)
 
-    orign_vecs = tf.gather(flat_spectrified_var,base_time_slot_ids,axis=0)
-    compare_vecs = tf.gather(flat_spectrified_var,compare_ids,axis=0)
+    #tiled_song_idx = tf.tile(tf.reshape(song_idx,(1,)),(BATCH_SIZE,))
 
-    return orign_vecs,compare_vecs,song_ids,is_correct
+    return origins,compares,song_idx,is_correct
 
-def flatten_audios(spec_list):
-    lens = [len(spec) for spec in spec_list]
-    begin_lens = [0]+lens[:-1]
-    np_lens = np.asarray(begin_lens)
-    start_markers = np.cumsum(np_lens)
-    flattened_specs = np.concatenate(spec_list)
-    return flattened_specs, start_markers, np.asarray(lens)
+def make_file_generator(all_filenames, source_dir):
+    def file_generator():
+        file_indicies = np.arange(len(all_filenames))
+        for _ in range(100000):
+            np.random.shuffle(file_indicies)
+            for idx in file_indicies:
+                np_data = np.load(source_dir+all_filenames[idx])
+                if len(np_data) > 50:
+                    yield (np_data, idx)
+    return file_generator
 
-def load_spec_list(base_folder):
-    all_filenames = process_many_files.get_all_paths(base_folder,"npy")
-    all_file_datas = [np.load(os.path.join(base_folder,fname)) for fname in all_filenames]
-    return all_filenames,all_file_datas
+def flatten_batch(batch, desired_shapes):
+    res = []
+    for item,shape in zip(batch,desired_shapes):
+        res.append(tf.reshape(item,shape))
+    return res
+
+def get_read_npy(base_folder):
+    def read_npy(fname):
+        return np.load(base_folder+fname.decode())
+    return read_npy
 
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
-    BATCH_SIZE = config['BATCH_SIZE']
 
-    music_paths, spectrified_list = load_spec_list(config['BASE_MUSIC_FOLDER'])
+    all_filenames = music_paths = process_many_files.get_all_paths(config['BASE_MUSIC_FOLDER'],"npy",lambda fname: np.load(fname).shape[0] > 100)
+    #print(all_filenames)
+    actual_generator = make_file_generator(all_filenames,config['BASE_MUSIC_FOLDER'])
+    #fnames = tf.data.Dataset.from_tensor_slices(all_filenames)
+    #fnames = fnames.shuffle(len(all_filenames))
+    #act_read_npy = get_read_npy(config['BASE_MUSIC_FOLDER'])
+    #ds1 = fnames.map(
+    #    lambda item: tuple(tf.py_func(act_read_npy, [item], [tf.float32,])),num_parallel_calls=multiprocessing.cpu_count())
+    #ds2 = tf.data.Dataset.from_tensor_slices(tf.range(len(all_filenames)))
+    #ds3 = tf.data.Dataset.from_tensor_slices(get_np_lens(all_filenames))
+    #ds = tf.data.Dataset.zip((ds1,ds2))
 
-    flat_spectrified_list, flat_start_markers, song_lens = flatten_audios(spectrified_list)
+    #all_data = list(actual_generator())#()]
+    ds = tf.data.Dataset.from_generator(
+        actual_generator, (tf.float32,tf.int32), (tf.TensorShape([None,config['NUM_MEL_BINS']]),tf.TensorShape([])))
+    #ds1 = tf.data.Dataset.from_tensor_slices([tf.constant(data[0]) for data in all_data])
+    #ds2 = tf.data.Dataset.from_tensors([tf.constant(data[1]) for data in all_data])
+    #ds3 = tf.data.Dataset.from_tensors([tf.constant(data[2]) for data in all_data])
+    #ds = tf.data.Dataset.zip([ds1,ds2,ds3])
+    ds = ds.map(lambda word_vecs,song_idx: get_batch_from_var(word_vecs,song_idx,config),num_parallel_calls=multiprocessing.cpu_count())
+    ds = ds.repeat(count=10000000000000)
 
-    tf_song_lens = tf.constant(song_lens,dtype=tf.int32)
-    tf_flat_start_markers = tf.constant(flat_start_markers,dtype=tf.int32)
-    flat_spectrified_var = tf.constant(flat_spectrified_list,dtype=tf.float32)
+    SAMPLE_SIZE = config['SAMPLES_PER_SONG']
+    STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
+    VEC_SIZE = config['NUM_MEL_BINS']
+    SONGS_PER_BATCH =  config['SONGS_PER_BATCH']
+    FINAL_SIZE = SAMPLE_SIZE * SONGS_PER_BATCH
+    desired_shapes = (
+        [FINAL_SIZE,STEPS_IN_WINDOW,VEC_SIZE],
+        [FINAL_SIZE,STEPS_IN_WINDOW,VEC_SIZE],
+        [SONGS_PER_BATCH],
+        [FINAL_SIZE],
+        )
+    #,multiprocessing.cpu_count())
+    ds = ds.batch(SONGS_PER_BATCH)
+    #ds = ds.map(lambda a1,a2,a3,a4: flatten_batch([a1,a2,a3,a4],desired_shapes))
+    ds = ds.prefetch(8)
 
-    music_vectors = OutputVectors(len(spectrified_list),config['OUTPUT_VECTOR_SIZE'])
+    iter = ds.make_one_shot_iterator()
+    origin_compare, cross_compare, song_idxs, is_same_compare = iter.get_next()
 
-    origin_compare, cross_compare, song_id_batch, is_same_compare = get_batch_from_var(flat_spectrified_var, tf_flat_start_markers, tf_song_lens, BATCH_SIZE, config['WINDOW_SIZE'])
+    music_vectors = OutputVectors(len(all_filenames),config['OUTPUT_VECTOR_SIZE'])
 
-    global_vectors = music_vectors.get_index_rows(song_id_batch)
+    song_vecs = music_vectors.get_index_rows(song_idxs)
+    tiled_song_vecs = tf.reshape(song_vecs,(SONGS_PER_BATCH,1,config['OUTPUT_VECTOR_SIZE']))
+    tiled_song_vecs = tf.tile(tiled_song_vecs,(1,SAMPLE_SIZE,1))
 
-    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
+    input_shape = [SONGS_PER_BATCH,SAMPLE_SIZE,STEPS_IN_WINDOW,VEC_SIZE]
+    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['STEPS_IN_WINDOW'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'], input_shape)
 
-    loss = linearlizer.loss(origin_compare, cross_compare, global_vectors, is_same_compare)
+    loss = linearlizer.loss(origin_compare, cross_compare, tiled_song_vecs, is_same_compare)
 
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
     optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
@@ -130,10 +175,10 @@ def train_all():
 
     result_collection = ResultsTotal(SAVE_REPO)
 
-    gpu_config = tf.ConfigProto(
+    gpuconfig = tf.ConfigProto(
         device_count = {'GPU': int(config['USE_GPU'])}
     )
-    with tf.Session(config=gpu_config) as sess:
+    with tf.Session(config=gpuconfig) as sess:
         if os.path.exists(SAVE_REPO):
             epoc_start = int(open(SAVE_REPO+"epoc_num.txt").read())
             save_music_name_list(SAVE_REPO,music_paths)
@@ -158,12 +203,12 @@ def train_all():
         for epoc in range(epoc_start,100000000000):
             epoc_loss_sum = 0
             print("EPOC: {}".format(epoc))
-            for x in range(config['TRAIN_STEPS_PER_SAVE']//BATCH_SIZE):
+            for x in range(config['TRAIN_STEPS_PER_SAVE']//FINAL_SIZE):
                 #print()
                 opt_res,loss_res = sess.run([optim,loss])
                 epoc_loss_sum += loss_res
                 train_steps += 1
-                if train_steps % (config['TRAIN_STEPS_PER_PRINT']//BATCH_SIZE) == 0:
+                if train_steps % (config['TRAIN_STEPS_PER_PRINT']//FINAL_SIZE) == 0:
                     print(epoc_loss_sum/(x+1))
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc))
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc)
@@ -181,7 +226,7 @@ if __name__ == "__main__":
     parser.add_argument('vector_dataset', help='Path to folder full of .npy files (looks recursively into subfolders for .npy files).')
     parser.add_argument('output_folder', help='Path to output folder where files will be stored.')
     parser.add_argument('--config', dest='config_yaml', default="default_config.yaml",
-                    help='define the .yaml config file (default is "default_config.yaml")')
+                    help='define the .yaml config file (default is "defaultconfig.yaml")')
     args = parser.parse_args()
 
     config = yaml.safe_load(open(args.config_yaml))
