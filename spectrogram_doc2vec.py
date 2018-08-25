@@ -170,7 +170,8 @@ def train_all():
     loss = linearlizer.loss(origin_compare, cross_compare, tiled_song_vecs, is_same_compare)
 
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    optimizer = tf.train.RMSPropOptimizer(learning_rate=config['ADAM_learning_rate'],epsilon=10e-5)
     optim = optimizer.minimize(loss)
 
     result_collection = ResultsTotal(SAVE_REPO)

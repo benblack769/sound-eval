@@ -14,9 +14,23 @@ def load_spec_list(base_folder):
 def run_spec_list(spec_list,config,model_path):
     vecs = tf.placeholder(tf.float32, [None, config['NUM_MEL_BINS']])
 
-    linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'])
+    #vecs = tf.reshape(vecs,(None, config['NUM_MEL_BINS'], 1))
 
-    wordvec = linearlizer.word_vector(vecs)
+    SAMPLE_SIZE = config['SAMPLES_PER_SONG']
+    STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
+    VEC_SIZE = config['NUM_MEL_BINS']
+    SONGS_PER_BATCH =  config['SONGS_PER_BATCH']
+
+    input_shape = (-1,STEPS_IN_WINDOW,VEC_SIZE)
+
+    batches = [vecs[x:tf.shape(vecs)[0]+x-STEPS_IN_WINDOW] for x in range(STEPS_IN_WINDOW)]
+
+    inputs = tf.stack(batches,axis=2)
+    print(inputs.shape)
+
+    linearlizer = Linearlizer(config['NUM_MEL_BINS'], STEPS_IN_WINDOW, config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'], input_shape)
+
+    wordvec = linearlizer.word_vector(inputs)
     with tf.Session() as sess:
         linearlizer.load(sess, model_path)
         wordvecs_list = []
@@ -35,7 +49,7 @@ def make_dirs(paths):
             os.makedirs(pathdir)
 
 def calc_all_vectors(source_dir, dest_dir, model_path, config):
-    all_filenames = process_many_files.get_all_paths(source_dir,"npy")
+    all_filenames = process_many_files.get_all_paths(source_dir,"npy",lambda fname: np.load(fname).shape[0] > 100)
     source_abs_filenames = [os.path.join(source_dir,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_dir,filename) for filename in all_filenames]
 
