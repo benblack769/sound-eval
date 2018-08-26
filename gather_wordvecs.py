@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     all_word_vecs = calc_all_vectors(all_filepaths,args.vector_dataset,args.model_path,_config)
 
-    summed_word_vecs = np.stack(np.mean(wv,axis=0) for wv in all_word_vecs)
+    summed_word_vecs = np.stack(np.sum(wv,axis=0) for wv in all_word_vecs)
     concat_vecs = np.concatenate([doc_vecs,summed_word_vecs],axis=1)
 
     np.save(args.output_npy_path,concat_vecs)
