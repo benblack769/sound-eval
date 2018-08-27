@@ -164,7 +164,7 @@ def train_all():
     tiled_song_vecs = tf.reshape(song_vecs,(SONGS_PER_BATCH,1,config['OUTPUT_VECTOR_SIZE']))
     tiled_song_vecs = tf.tile(tiled_song_vecs,(1,SAMPLE_SIZE,1))
 
-    input_shape = [SONGS_PER_BATCH,SAMPLE_SIZE,STEPS_IN_WINDOW,VEC_SIZE]
+    input_shape = (SONGS_PER_BATCH,SAMPLE_SIZE,STEPS_IN_WINDOW,VEC_SIZE)
     linearlizer = Linearlizer(config['NUM_MEL_BINS'], config['STEPS_IN_WINDOW'], config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'], input_shape)
 
     loss = linearlizer.loss(origin_compare, cross_compare, tiled_song_vecs, is_same_compare)

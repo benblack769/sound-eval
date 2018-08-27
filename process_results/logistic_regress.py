@@ -59,8 +59,8 @@ class SoftmaxFitter:
 
 def calc_logit_regress_stats(inputs,outputs):
     (train_inputs,train_outputs),(test_inputs,test_outputs) = get_test_train(inputs,outputs)
-    logit_model = SoftmaxFitter()
-    #logit_model = svm.SVC(kernel='linear')
+    #logit_model = SoftmaxFitter()
+    logit_model = svm.SVC(kernel='linear')
     logit_model.fit(train_inputs,train_outputs)
     prediction = logit_model.predict(test_inputs)
 
@@ -77,7 +77,7 @@ def calc_logit_regress_stats(inputs,outputs):
 def run_stats(doc_csv,doc_vecs):
     new_doc_vecs = np.concatenate([np.maximum(doc_vecs,0),np.maximum(-doc_vecs,0)],axis=1)
     #result = doc_csv['classID']# == "drilling"
-    result = doc_csv['genre_top']
+    result = doc_csv['author']
     uniques = set(result)
     mapping = {item:idx for idx,item in enumerate(uniques)}
     result = np.asarray([mapping[item] for item in result])

@@ -3,6 +3,9 @@ from WeightBias import DenseLayer
 import numpy as np
 import os
 
+def sqr(x):
+    return x * x
+
 class Linearlizer:
     def __init__(self,
             input_size,
@@ -34,9 +37,11 @@ class Linearlizer:
         input_vec = word_vector + global_vector
         output_vec = cross_vector
 
+        reg_cost = 0.005 * (tf.reduce_mean(sqr(input_vec)) + tf.reduce_mean(sqr(output_vec)))
+
         logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=2)*0.1)
         cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
-        return tf.reduce_mean(cost)
+        return tf.reduce_mean(cost) + reg_cost
 
     def word_vector(self, input):
         input = tf.reshape(input,shape=self.input_shape[:-2]+(self.input_dims,))
