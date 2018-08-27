@@ -28,9 +28,9 @@ if __name__ == "__main__":
     proc_path = args.model_path
     final_epoc = read_file(os.path.join(proc_path,"epoc_num.txt"))
 
-    vectors_path = os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
+    #vectors_path = os.path.join(proc_path,"vector_at_{}.npy".format(final_epoc))
 
-    doc_vecs = np.load(vectors_path)
+    #doc_vecs = np.load(vectors_path)
 
     all_filepaths = [os.path.normpath(fname) for fname in read_file(os.path.join(args.model_path,"music_list.txt")).strip().split("\n")]
 
@@ -39,6 +39,6 @@ if __name__ == "__main__":
     all_word_vecs = calc_all_vectors(all_filepaths,args.vector_dataset,args.model_path,_config)
 
     summed_word_vecs = np.stack(np.sum(wv,axis=0) for wv in all_word_vecs)
-    concat_vecs = np.concatenate([doc_vecs,summed_word_vecs],axis=1)
+    #concat_vecs = np.concatenate([doc_vecs,summed_word_vecs],axis=1)
 
-    np.save(args.output_npy_path,concat_vecs)
+    np.save(args.output_npy_path,summed_word_vecs)

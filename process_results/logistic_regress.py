@@ -5,6 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation
 import sklearn.linear_model
 from sklearn import svm    			# To fit the svm classifier\
+import os
 
 PROPORTION_TEST = 0.2
 
@@ -76,20 +77,37 @@ def calc_logit_regress_stats(inputs,outputs):
 
 def run_stats(doc_csv,doc_vecs):
     new_doc_vecs = np.concatenate([np.maximum(doc_vecs,0),np.maximum(-doc_vecs,0)],axis=1)
-    #result = doc_csv['classID']# == "drilling"
-    result = doc_csv['genre_top']
+    result = doc_csv['classID']# == "drilling"
+    #result = doc_csv['genre_top']
     uniques = set(result)
     mapping = {item:idx for idx,item in enumerate(uniques)}
     result = np.asarray([mapping[item] for item in result])
     calc_logit_regress_stats(doc_vecs,result)
 
+
+def read_file(filename):
+    with open(filename) as file:
+        return file.read()
+
+
+def order_csv(filename_list, data_csv):
+    val_dataframe = pandas.DataFrame(data={
+        "filename":filename_list
+    })
+    unique_data = data_csv.drop_duplicates(subset="filename")
+    joined_metadata = val_dataframe.merge(unique_data,on="filename",how="left",sort=False)
+    return joined_metadata
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Collect document statistics")
     parser.add_argument('document_csv', help='Document csv.')
+    parser.add_argument('order_filename_list', help='list of filenames that are in the same order as the vectors.')
     parser.add_argument('vectors_npy', help='Vectors npy doc.')
 
     args = parser.parse_args()
 
     data_csv = pandas.read_csv(args.document_csv)
     data_vectors = np.load(args.vectors_npy)
-    run_stats(data_csv,data_vectors)
+    filename_list = [os.path.normpath(fname)[:-4] for fname in read_file(args.order_filename_list).strip().split("\n")]
+    ordered_csv = order_csv(filename_list, data_csv)
+    run_stats(ordered_csv,data_vectors)
