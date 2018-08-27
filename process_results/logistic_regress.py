@@ -77,7 +77,10 @@ def calc_logit_regress_stats(inputs,outputs):
 def run_stats(doc_csv,doc_vecs):
     new_doc_vecs = np.concatenate([np.maximum(doc_vecs,0),np.maximum(-doc_vecs,0)],axis=1)
     #result = doc_csv['classID']# == "drilling"
-    result = doc_csv['target']
+    result = doc_csv['genre_top']
+    uniques = set(result)
+    mapping = {item:idx for idx,item in enumerate(uniques)}
+    result = np.asarray([mapping[item] for item in result])
     calc_logit_regress_stats(doc_vecs,result)
 
 if __name__ == "__main__":
