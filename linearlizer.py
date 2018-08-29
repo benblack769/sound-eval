@@ -41,7 +41,9 @@ class Linearlizer:
 
         reg_cost = self.mag_regularization * (tf.reduce_mean(sqr(input_vec)) + tf.reduce_mean(sqr(output_vec)))
 
-        logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=2)*0.1)
+        num_dim = len(word_vector.shape)
+        print(num_dim)
+        logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=num_dim-1)*0.1)
         cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
         return tf.reduce_mean(cost) + reg_cost
 
