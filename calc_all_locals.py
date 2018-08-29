@@ -2,6 +2,7 @@ import numpy as np
 import argparse
 import yaml
 import os
+import sys
 import process_many_files
 import tensorflow as tf
 from linearlizer import Linearlizer
@@ -9,7 +10,7 @@ from helperclasses import OutputVectors
 import random
 
 gpu_config = tf.ConfigProto(
-    device_count = {'GPU': int(False)}
+    device_count = {'GPU': int(True)},
 )
 
 def calc_all_compare_vecs(spec_list,config,model_path,linearlizer):
@@ -104,8 +105,8 @@ def calc_all_locals(spec_list,config,model_path):
     loss = linearlizer.loss_vec_computed(origin_compare, cross_compare, local_vecs, is_same_compare)
 
     SGD_learning_rate = 5.0
-    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
+    #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
     optim = optimizer.minimize(loss)
 
     with tf.Session(config=gpu_config) as sess:
@@ -117,20 +118,22 @@ def calc_all_locals(spec_list,config,model_path):
             word_vec_val, cmp_vec_val = sess.run([word_vec_tfval,cmp_vec_tfval],feed_dict={
                 spec_vecs:spec_list[idx]
             })
-            for x in range(200):
+
+            for x in range(100):
                 opt_val, loss_val = sess.run([optim, loss],feed_dict={
                     word_vecs:word_vec_val,#all_word_vecs[idx],
                     cmp_vecs:cmp_vec_val
                 })
 
+            print("new vec calculated",idx)
             print(loss_val)
-            print("new vec calculated")
             START_LOC = INVALID_BEFORE_RANGE_START + INVALID_BEFORE_RANGE_VAR + STEPS_IN_WINDOW
             END_LOC = len(word_vec_val) - (STEPS_IN_WINDOW*2 + STEPS_BETWEEN_WINDOWS + WINDOW_GAP_RANGE)
 
             loc_vecs = local_vec_var.get_vector_values(sess)[START_LOC:END_LOC]
-            print(loc_vecs)
+            #print(loc_vecs)
             local_vecs_list.append(loc_vecs)
+            sys.stdout.flush()
 
     return local_vecs_list
 
@@ -143,7 +146,7 @@ def make_dirs(paths):
 def calc_all_vectors(source_dir, dest_dir, model_path, config):
     all_filenames = process_many_files.get_all_paths(source_dir,"npy")
     #random.shuffle(all_filenames)
-    #all_filenames = all_filenames[:50]
+    #all_filenames = all_filenames[:20]
     source_abs_filenames = [os.path.join(source_dir,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_dir,filename) for filename in all_filenames]
 
