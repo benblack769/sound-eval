@@ -28,7 +28,7 @@ def run_spec_list(spec_list,config,model_path):
     inputs = tf.stack(batches,axis=2)
     print(inputs.shape)
 
-    linearlizer = Linearlizer(config['NUM_MEL_BINS'], STEPS_IN_WINDOW, config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'], input_shape)
+    linearlizer = Linearlizer(config['NUM_MEL_BINS'], STEPS_IN_WINDOW, config['HIDDEN_SIZE'], config['OUTPUT_VECTOR_SIZE'], input_shape, config['MAG_REGULARIZATION_PARAM'])
 
     wordvec = linearlizer.word_vector(inputs)
     with tf.Session() as sess:

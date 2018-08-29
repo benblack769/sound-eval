@@ -16,6 +16,7 @@ OUTPUT_VECTOR_SIZE: 48
 # traning parameters
 BATCH_SIZE: 1024 # must be a multiple of 4
 ADAM_learning_rate: 0.001
+MAG_REGULARIZATION_PARAM: 0.0002 # seems to work well between 0.001 and 0.0001
 
 # dataset parameters
 MAX_NUM_FILES: 10000

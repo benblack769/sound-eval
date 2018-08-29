@@ -12,7 +12,8 @@ class Linearlizer:
             input_width,
             hidden_size,
             output_size,
-            input_shape):
+            input_shape,
+            mag_regularization):
 
         self.input_size = input_size
         self.input_dims = input_dims = input_size * input_width
@@ -20,6 +21,7 @@ class Linearlizer:
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.input_shape = input_shape
+        self.mag_regularization = mag_regularization
         HIDDEN_SIZE_2 = 256
 
         self.hidden_origin = DenseLayer('relu_origin',input_dims,hidden_size)
@@ -37,7 +39,7 @@ class Linearlizer:
         input_vec = word_vector + global_vector
         output_vec = cross_vector
 
-        reg_cost = 0.005 * (tf.reduce_mean(sqr(input_vec)) + tf.reduce_mean(sqr(output_vec)))
+        reg_cost = self.mag_regularization * (tf.reduce_mean(sqr(input_vec)) + tf.reduce_mean(sqr(output_vec)))
 
         logit_assignment = tf.nn.sigmoid(tf.reduce_mean(input_vec * output_vec,axis=2)*0.1)
         cost = tf.nn.sigmoid_cross_entropy_with_logits(logits=logit_assignment,labels=is_same)
