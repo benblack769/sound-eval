@@ -75,9 +75,9 @@ def calc_logit_regress_stats(inputs,outputs):
     #print("Train dataset composition: {}".format(1-train_composition))
     #print("Logit score: {}".format(score))
 
-def run_stats(doc_csv,doc_vecs):
+def run_stats(doc_csv,doc_vecs,sel_column):
     new_doc_vecs = np.concatenate([np.maximum(doc_vecs,0),np.maximum(-doc_vecs,0)],axis=1)
-    result = doc_csv['classID']# == "drilling"
+    result = doc_csv[sel_column]# == "drilling"
     #result = doc_csv['genre_top']
     uniques = set(result)
     mapping = {item:idx for idx,item in enumerate(uniques)}
@@ -103,6 +103,7 @@ if __name__ == "__main__":
     parser.add_argument('document_csv', help='Document csv.')
     parser.add_argument('order_filename_list', help='list of filenames that are in the same order as the vectors.')
     parser.add_argument('vectors_npy', help='Vectors npy doc.')
+    parser.add_argument('compare_class', help='collumn in csv to classify.')
 
     args = parser.parse_args()
 
@@ -110,4 +111,4 @@ if __name__ == "__main__":
     data_vectors = np.load(args.vectors_npy)
     filename_list = [os.path.normpath(fname)[:-4] for fname in read_file(args.order_filename_list).strip().split("\n")]
     ordered_csv = order_csv(filename_list, data_csv)
-    run_stats(ordered_csv,data_vectors)
+    run_stats(ordered_csv,data_vectors,args.compare_class)

@@ -1,0 +1,30 @@
+# sound evaluation parameters
+SAMPLERATE: 16000
+TIME_SEGMENT_SIZE: 0.1
+
+STEPS_BETWEEN_WINDOWS: 1
+STEPS_IN_WINDOW: 3
+WINDOW_GAP_RANGE: 0
+GEOM_PROB: 0.1
+
+# output parameters
+TRAIN_STEPS_PER_SAVE: 20000000
+TRAIN_STEPS_PER_PRINT: 100000
+NUM_REFERENCE_VECS: 4000
+
+# model parameters
+NUM_MEL_BINS: 80
+HIDDEN_SIZE: 512
+OUTPUT_VECTOR_SIZE: 80
+
+# traning parameters
+SAMPLES_PER_SONG: 128
+SONGS_PER_BATCH: 8
+ADAM_learning_rate: 0.001
+MAG_REGULARIZATION_PARAM: 0.0001 # seems to work well around 0.0001
+
+# dataset parameters
+MAX_NUM_FILES: 10000
+
+# hardware parameters
+USE_GPU: True
