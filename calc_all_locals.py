@@ -105,8 +105,8 @@ def calc_all_locals(spec_list,config,model_path):
     loss = linearlizer.loss_vec_computed(origin_compare, cross_compare, local_vecs, is_same_compare)
 
     SGD_learning_rate = 5.0
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    #optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
+    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate']*0.01)
     optim = optimizer.minimize(loss)
 
     with tf.Session(config=gpu_config) as sess:
@@ -124,6 +124,8 @@ def calc_all_locals(spec_list,config,model_path):
                     word_vecs:word_vec_val,#all_word_vecs[idx],
                     cmp_vecs:cmp_vec_val
                 })
+                if x % 20 == 0:
+                    print(loss_val)
 
             print("new vec calculated",idx)
             print(loss_val)
