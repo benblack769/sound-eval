@@ -8,41 +8,42 @@ import tensorflow as tf
 from linearlizer import Linearlizer
 from helperclasses import OutputVectors
 import random
+import tensorflow_probability
 
 gpu_config = tf.ConfigProto(
     device_count = {'GPU': int(True)},
 )
 
-def calc_all_compare_vecs(spec_list,config,model_path,linearlizer):
-    vecs = tf.placeholder(tf.float32, [None, config['NUM_MEL_BINS']])
+def sample_geom(prob,shape):
+    n = tensorflow_probability.distributions.Geometric(probs=prob)
+    arg = n.sample(shape)
+    intarg = tf.cast(arg,dtype=tf.int32)
+    return intarg
 
-    comp_vec = linearlizer.compare_vector(vecs)
-
-    with tf.Session() as sess:
-        linearlizer.load(sess, model_path)
-        compvecs_list = []
-        for spec in spec_list:
-            val = sess.run(comp_vec,feed_dict={
-                vecs:spec
-            })
-            compvecs_list.append(val)
-
-    return compvecs_list
+def get_invalid_compare_idicies(origin_starts,end_sample,batch_size,config):
+    SAMPLE_SIZE = config['SAMPLES_PER_SONG']//2
+    NUM_RESAMPLES = 3
+    pos_negs = tf.random_uniform((NUM_RESAMPLES,batch_size),minval=0,maxval=2,dtype=tf.int32)*2-1
+    offsets = origin_starts[batch_size:] + pos_negs * (1+sample_geom(config['GEOM_PROB'],(NUM_RESAMPLES,batch_size)))
+    def_offsets = tf.random_uniform((batch_size,),minval=0,maxval=end_sample,dtype=tf.int32)
+    curvec = def_offsets
+    for idx in range(NUM_RESAMPLES):
+        consider_offsets = offsets[idx]
+        curvec = tf.where((consider_offsets < 0) | (consider_offsets >= end_sample),curvec,consider_offsets)
+    return curvec
 
 def get_train_batch(word_vecs,cmp_vecs, config):
     NUM_WORDS_PER_BATCH = 5
 
     STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
     STEPS_BETWEEN_WINDOWS = config['STEPS_BETWEEN_WINDOWS']
-    INVALID_BEFORE_RANGE_START = config['INVALID_BEFORE_RANGE_START']
     WINDOW_GAP_RANGE = config['WINDOW_GAP_RANGE']
-    INVALID_BEFORE_RANGE_VAR = config['INVALID_BEFORE_RANGE_VAR']
     #BATCH_SIZE = config['SAMPLES_PER_SONG']
 
     word_vecs = word_vecs#[0]
     word_vec_len = tf.shape(word_vecs)[0]
 
-    START_LOC = INVALID_BEFORE_RANGE_START + INVALID_BEFORE_RANGE_VAR + STEPS_IN_WINDOW
+    START_LOC = 0
     END_LOC = word_vec_len - (STEPS_IN_WINDOW*2 + STEPS_BETWEEN_WINDOWS + WINDOW_GAP_RANGE)
 
     local_vec_size = END_LOC - START_LOC
@@ -51,7 +52,7 @@ def get_train_batch(word_vecs,cmp_vecs, config):
 
     origin_starts = tf.tile(tf.range(START_LOC,END_LOC,dtype=tf.int32), (NUM_WORDS_PER_BATCH*2,))#tf.random_uniform((BATCH_SIZE,1),dtype=tf.int32,minval=START_LOC,maxval=END_LOC)
     valid_compare_starts = origin_starts[:half_batch_size] + (STEPS_IN_WINDOW + STEPS_BETWEEN_WINDOWS) + tf.random_uniform((half_batch_size,),dtype=tf.int32,minval=-WINDOW_GAP_RANGE,maxval=WINDOW_GAP_RANGE+1)
-    invalid_compare_start = origin_starts[half_batch_size:] + (- STEPS_IN_WINDOW - INVALID_BEFORE_RANGE_START) - tf.random_uniform((half_batch_size,),dtype=tf.int32,minval=0,maxval=INVALID_BEFORE_RANGE_VAR)
+    invalid_compare_start = get_invalid_compare_idicies(origin_starts,word_vec_len-STEPS_IN_WINDOW,half_batch_size,config)
     all_compare_starts = tf.concat([valid_compare_starts,invalid_compare_start],axis=0)
 
     origins = tf.gather(word_vecs, origin_starts,axis=0)
@@ -66,9 +67,7 @@ def get_train_batch(word_vecs,cmp_vecs, config):
 def calc_all_locals(spec_list,config,model_path):
     STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
     STEPS_BETWEEN_WINDOWS = config['STEPS_BETWEEN_WINDOWS']
-    INVALID_BEFORE_RANGE_START = config['INVALID_BEFORE_RANGE_START']
     WINDOW_GAP_RANGE = config['WINDOW_GAP_RANGE']
-    INVALID_BEFORE_RANGE_VAR = config['INVALID_BEFORE_RANGE_VAR']
 
     SAMPLE_SIZE = config['SAMPLES_PER_SONG']
     STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
@@ -104,22 +103,23 @@ def calc_all_locals(spec_list,config,model_path):
     print(local_vecs.shape)
     loss = linearlizer.loss_vec_computed(origin_compare, cross_compare, local_vecs, is_same_compare)
 
-    SGD_learning_rate = 5.0
+    SGD_learning_rate = 1.0
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=SGD_learning_rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate']*0.01)
+    optimizer = tf.train.AdamOptimizer(learning_rate=config['ADAM_learning_rate'])
     optim = optimizer.minimize(loss)
 
     with tf.Session(config=gpu_config) as sess:
-        sess.run(tf.global_variables_initializer())
-        linearlizer.load(sess,model_path)
         local_vecs_list = []
+        glob_init = tf.global_variables_initializer()
         for idx in range(len(spec_list)):
+            sess.run(glob_init)
+            linearlizer.load(sess,model_path)
             local_vec_var.initialize(sess)
             word_vec_val, cmp_vec_val = sess.run([word_vec_tfval,cmp_vec_tfval],feed_dict={
                 spec_vecs:spec_list[idx]
             })
 
-            for x in range(100):
+            for x in range(400):
                 opt_val, loss_val = sess.run([optim, loss],feed_dict={
                     word_vecs:word_vec_val,#all_word_vecs[idx],
                     cmp_vecs:cmp_vec_val
@@ -128,8 +128,7 @@ def calc_all_locals(spec_list,config,model_path):
                     print(loss_val)
 
             print("new vec calculated",idx)
-            print(loss_val)
-            START_LOC = INVALID_BEFORE_RANGE_START + INVALID_BEFORE_RANGE_VAR + STEPS_IN_WINDOW
+            START_LOC = 0
             END_LOC = len(word_vec_val) - (STEPS_IN_WINDOW*2 + STEPS_BETWEEN_WINDOWS + WINDOW_GAP_RANGE)
 
             loc_vecs = local_vec_var.get_vector_values(sess)[START_LOC:END_LOC]

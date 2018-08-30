@@ -41,7 +41,7 @@ def make_dirs(paths):
             os.makedirs(pathdir)
 
 def calc_all_vectors(source_dir, dest_dir, model_path, config):
-    all_filenames = process_many_files.get_all_paths(source_dir,"npy",lambda fname: np.load(fname).shape[0] > 100)
+    all_filenames = process_many_files.get_all_paths(source_dir,"npy")
     source_abs_filenames = [os.path.join(source_dir,filename) for filename in all_filenames]
     dest_abs_filenames = [os.path.join(dest_dir,filename) for filename in all_filenames]
 
@@ -62,3 +62,4 @@ if __name__ == "__main__":
     _config = yaml.safe_load(open(args.model_path+"config.yaml"))
 
     calc_all_vectors(args.vector_dataset,args.output_folder,args.model_path,_config)
+    print("finished")

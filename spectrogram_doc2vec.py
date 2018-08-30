@@ -9,6 +9,7 @@ from WeightBias import DenseLayer
 from linearlizer import Linearlizer
 import multiprocessing
 import subprocess
+import tensorflow_probability
 from concurrent.futures import ThreadPoolExecutor
 from helperclasses import OutputVectors,ResultsTotal
 
@@ -22,31 +23,52 @@ def save_string(filename,string):
     with open(filename,'w') as file:
         file.write(string)
 
+def read_str(filename):
+    with open(filename) as file:
+        return file.read()
+
 def save_music_name_list(save_reop,path_list):
     save_str = "\n".join([path for path in path_list])
     save_string(save_reop+"music_list.txt",save_str)
 
+def sample_geom(prob,shape):
+    n = tensorflow_probability.distributions.Geometric(probs=prob)
+    arg = n.sample(shape)
+    intarg = tf.cast(arg,dtype=tf.int32)
+    return intarg
+
+def get_invalid_compare_idicies(origin_starts,end_sample,config):
+    SAMPLE_SIZE = config['SAMPLES_PER_SONG']//2
+    NUM_RESAMPLES = 3
+    pos_negs = tf.random_uniform((NUM_RESAMPLES,SAMPLE_SIZE),minval=0,maxval=2,dtype=tf.int32)*2-1
+    offsets = origin_starts[SAMPLE_SIZE:] + pos_negs * sample_geom(config['GEOM_PROB'],(NUM_RESAMPLES,SAMPLE_SIZE))
+    def_offsets = tf.random_uniform((SAMPLE_SIZE,),minval=0,maxval=end_sample,dtype=tf.int32)
+    curvec = def_offsets
+    for idx in range(NUM_RESAMPLES):
+        consider_offsets = offsets[idx]
+        curvec = tf.where((consider_offsets < 0) | (consider_offsets >= end_sample),curvec,consider_offsets)
+    return curvec
+
 def get_batch_from_var(word_vecs, song_idx, config):
     STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
     STEPS_BETWEEN_WINDOWS = config['STEPS_BETWEEN_WINDOWS']
-    INVALID_BEFORE_RANGE_START = config['INVALID_BEFORE_RANGE_START']
     WINDOW_GAP_RANGE = config['WINDOW_GAP_RANGE']
-    INVALID_BEFORE_RANGE_VAR = config['INVALID_BEFORE_RANGE_VAR']
     BATCH_SIZE = config['SAMPLES_PER_SONG']
 
     word_vecs = word_vecs#[0]
     word_vec_len = tf.shape(word_vecs)[0]
 
-    START_LOC = INVALID_BEFORE_RANGE_START + INVALID_BEFORE_RANGE_VAR + STEPS_IN_WINDOW
+    START_LOC = 0
     END_LOC = word_vec_len - (STEPS_IN_WINDOW*2 + STEPS_BETWEEN_WINDOWS + WINDOW_GAP_RANGE)
-    origin_starts = tf.random_uniform((BATCH_SIZE,1),dtype=tf.int32,minval=START_LOC,maxval=END_LOC)
-    valid_compare_starts = origin_starts[:BATCH_SIZE//2] + (STEPS_IN_WINDOW + STEPS_BETWEEN_WINDOWS) + tf.random_uniform((BATCH_SIZE//2,1),dtype=tf.int32,minval=-WINDOW_GAP_RANGE,maxval=WINDOW_GAP_RANGE+1)
-    invalid_compare_start = origin_starts[BATCH_SIZE//2:] + (- STEPS_IN_WINDOW - INVALID_BEFORE_RANGE_START) - tf.random_uniform((BATCH_SIZE//2,1),dtype=tf.int32,minval=0,maxval=INVALID_BEFORE_RANGE_VAR)
+    origin_starts = tf.random_uniform((BATCH_SIZE,),dtype=tf.int32,minval=START_LOC,maxval=END_LOC)
+    valid_compare_starts = origin_starts[:BATCH_SIZE//2] + (STEPS_IN_WINDOW + STEPS_BETWEEN_WINDOWS) + tf.random_uniform((BATCH_SIZE//2,),dtype=tf.int32,minval=-WINDOW_GAP_RANGE,maxval=WINDOW_GAP_RANGE+1)
+    invalid_compare_start = get_invalid_compare_idicies(origin_starts,word_vec_len-STEPS_IN_WINDOW,config)
+
     all_compare_starts = tf.concat([valid_compare_starts,invalid_compare_start],axis=0)
 
     arange = tf.range(STEPS_IN_WINDOW)
-    tiled_origin_starts = tf.tile(origin_starts,(1,STEPS_IN_WINDOW)) + arange
-    tiled_compare_starts = tf.tile(all_compare_starts,(1,STEPS_IN_WINDOW)) + arange
+    tiled_origin_starts = tf.tile(tf.reshape(origin_starts,(BATCH_SIZE,1)),(1,STEPS_IN_WINDOW)) + arange
+    tiled_compare_starts = tf.tile(tf.reshape(all_compare_starts,(BATCH_SIZE,1)),(1,STEPS_IN_WINDOW)) + arange
 
     origins = tf.gather(word_vecs, tiled_origin_starts,axis=0)
     compares = tf.gather(word_vecs, tiled_compare_starts,axis=0)
@@ -59,15 +81,14 @@ def get_batch_from_var(word_vecs, song_idx, config):
 
     return origins,compares,song_idx,is_correct
 
-def make_file_generator(all_filenames, source_dir):
+def make_file_generator(all_filenames, source_dir,config):
     def file_generator():
         file_indicies = np.arange(len(all_filenames))
         for _ in range(100000):
             np.random.shuffle(file_indicies)
             for idx in file_indicies:
                 np_data = np.load(source_dir+all_filenames[idx])
-                if len(np_data) > 50:
-                    yield (np_data, idx)
+                yield (np_data, idx)
     return file_generator
 
 def flatten_batch(batch, desired_shapes):
@@ -83,10 +104,11 @@ def get_read_npy(base_folder):
 
 def train_all():
     SAVE_REPO = config['STANDARD_SAVE_REPO']
+    min_width = config['STEPS_IN_WINDOW']*2 + config['STEPS_BETWEEN_WINDOWS'] + config['WINDOW_GAP_RANGE']
 
-    all_filenames = music_paths = process_many_files.get_all_paths(config['BASE_MUSIC_FOLDER'],"npy",lambda fname: np.load(fname).shape[0] > 100)
+    all_filenames = music_paths = process_many_files.get_all_paths(config['BASE_MUSIC_FOLDER'],"npy",lambda fname: np.load(fname).shape[0] > min_width)
     #print(all_filenames)
-    actual_generator = make_file_generator(all_filenames,config['BASE_MUSIC_FOLDER'])
+    actual_generator = make_file_generator(all_filenames,config['BASE_MUSIC_FOLDER'],config)
     #fnames = tf.data.Dataset.from_tensor_slices(all_filenames)
     #fnames = fnames.shuffle(len(all_filenames))
     #act_read_npy = get_read_npy(config['BASE_MUSIC_FOLDER'])
@@ -109,7 +131,7 @@ def train_all():
     SAMPLE_SIZE = config['SAMPLES_PER_SONG']
     STEPS_IN_WINDOW = config['STEPS_IN_WINDOW']
     VEC_SIZE = config['NUM_MEL_BINS']
-    SONGS_PER_BATCH =  config['SONGS_PER_BATCH']
+    SONGS_PER_BATCH = config['SONGS_PER_BATCH']
     FINAL_SIZE = SAMPLE_SIZE * SONGS_PER_BATCH
     desired_shapes = (
         [FINAL_SIZE,STEPS_IN_WINDOW,VEC_SIZE],
@@ -148,7 +170,7 @@ def train_all():
     )
     with tf.Session(config=gpuconfig) as sess:
         if os.path.exists(SAVE_REPO):
-            epoc_start = int(open(SAVE_REPO+"epoc_num.txt").read())
+            epoc_start = int(read_str(SAVE_REPO+"epoc_num.txt"))
             save_music_name_list(SAVE_REPO,music_paths)
             init = tf.global_variables_initializer()
             sess.run(init)
@@ -156,7 +178,7 @@ def train_all():
             music_vectors.load_vector_values(sess,result_collection.load_file(epoc_start))
         else:
             os.makedirs(SAVE_REPO)
-            open(SAVE_REPO+"cost_list.csv",'w').write("epoc,cost\n")
+            save_string(SAVE_REPO+"cost_list.csv","epoc,cost\n")
             save_music_name_list(SAVE_REPO,music_paths)
             epoc_start = 0
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc_start))
