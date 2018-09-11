@@ -174,6 +174,12 @@ if __name__ == "__main__":
     add_data = pandas.read_csv(csv_path)
     all_mp3_filepaths = [os.path.normpath(fname)[:-4] for fname in read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")]
 
+    vec_pairs = list(zip(actual_vecs,all_mp3_filepaths))
+    random.shuffle(vec_pairs)
+    vec_pairs = vec_pairs[:2000]
+    all_mp3_filepaths = [filename for vec,filename in vec_pairs]
+    actual_vecs = np.stack([vec for vec,filename in vec_pairs])
+    #all_mp3_filepaths = all_mp3_filepaths[:2000]
     #ordered_add_data = order_dataframe_by_filelist(add_data,all_mp3_filepaths)
     #print(add_data)
     #print(ordered_add_data)
