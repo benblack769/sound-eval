@@ -11,6 +11,7 @@ function make_dropdown_menu(base_sel,add_distance){
     delete object.x;
     delete object.y;
     delete object.filename;
+    delete object.citation;
 
     var keys = Object.keys(object);
     if(add_distance){
@@ -61,7 +62,7 @@ function select_element(filename){
 function list_key_values(data){
     var str = ""
     for(key in data){
-        if(key != "x" && key != "y" && key != "filename"){
+        if(key != "x" && key != "y" && key != "filename" && key != "citation"){
             str += key + ":" + data[key] + ",  "
         }
     }
@@ -114,14 +115,18 @@ function make_graphic(){
 		MG.zoom_to_raw_range(graphic_args)
 	})
 }
-function set_audio(filename){
+function set_audio(filename,citation){
     document.getElementById("audio_source").src = filename
+    document.getElementById("citation").innerText = citation
     document.getElementById("audio_id").load()
 }
 function set_audio_with_display(){
     var this_val = document.getElementById("selected_display").innerText;
     if(filename_set.has(this_val)) {
-        set_audio("mp3_files/"+this_val)
+        var idx = song_list.indexOf(this_val)
+        var dict_data = input_json_data[idx]
+        var citation = "citation" in dict_data ? input_json_data[idx]['citation'] : "";
+        set_audio("mp3_files/"+this_val,citation)
     }
 }
 function setup_interactive(){

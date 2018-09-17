@@ -149,6 +149,12 @@ def order_dataframe_by_filelist(df,file_list):
     #print(len(merged.filename))
     return merged
 
+def trim_data(orig_vecs, orig_filename_ordering):
+    indicies = np.random.choice(len(orig_vecs),size=max(2000,len(orig_vecs)),replace=False)
+    res_vecs = orig_vecs[indicies]
+    res_file_ordering = [orig_filename_ordering[idx] for idx in indicies]
+    return res_vecs,res_file_ordering
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Turn a folder full of .mid files into csvs with relevant data")
     parser.add_argument('doc2vec_result_folder', help='Path to spectrogram doc2vec output folder')
@@ -173,6 +179,13 @@ if __name__ == "__main__":
     actual_vecs = np.load(vectors_path)
     add_data = pandas.read_csv(csv_path)
     all_mp3_filepaths = [os.path.normpath(fname)[:-4] for fname in read_file(os.path.join(proc_path,"music_list.txt")).strip().split("\n")]
+    actual_vecs, all_mp3_filepaths = trim_data(actual_vecs,all_mp3_filepaths)
+
+    if "filename" not in add_data.columns:
+        raise RuntimeError("dataset csv needs a valid filename collumn to work")
+
+    if "citation" not in add_data.columns:
+        print("Warning: Please add a 'citation' collumn to the csv to provide attribution for the sound files.")
 
     vec_pairs = list(zip(actual_vecs,all_mp3_filepaths))
     random.shuffle(vec_pairs)
