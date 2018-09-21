@@ -6,6 +6,7 @@
 \usepackage{xcolor,colortbl}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usetikzlibrary{fit}
 
 
 \begin{document}
@@ -126,22 +127,63 @@ The neural network algorithm looks like this:
 
 With input vectors, $I_1, I_2$, and separate, but identical multi-layer networks 1 and 2, 	
 
-\begin{tikzpicture}[]
+%\begin{tikzpicture}[scale=0.6,mainnode/.style={font=\sffamily\footnotesize\bfseries}]
+%\node at (0,0) [mainnode] [draw] (songid) {Song id};
+%\node at (-3,2) [mainnode] [draw] (songveclist) {Song vector list};
+%\node at (-3,2) [mainnode] [draw] (songvec) {Song vector};
+%\end{tikzpicture}
+%a
 
-\node at (0,2) [rect, draw]   (ti1) {$I_{t1}$};
-\node at (4,2) [rect, draw]   (tv1) {$V_{t1}$};
-\node at (0,0) [rect, draw]   (ti2) {$I_{t2}$};
-\node at (4,0) [rect, draw]   (tv2) {$V_{t2}$};
-\node at (6,1) [circle, draw]   (dot) {dot};
-\node at (9,1) [rect, draw]   (approx) {Approximate distance};
+%\begin{tikzpicture}[scale=0.6,mainnode/.style={font=\sffamily\footnotesize\bfseries}]
+%\node at (0,0) [mainnode] [draw] (songid) {Song vector};
+%\node at (0,0) [mainnode] [draw] (songid) {Origin vector};
+%\end{tikzpicture}
 
-\path[every node/.style={font=\sffamily\footnotesize}]
-(ti1) [->] edge node [] {Multi-layer-network 1} (tv1)
-(ti2) [->] edge node [] {Multi-layer-network 2} (tv2)
-(tv1) [->] edge node [] {} (dot)
-(tv2) [->] edge node [] {} (dot)
-(dot) [->] edge node [] {} (approx);
-\end{tikzpicture}
+
+%\begin{tikzpicture}[scale=0.6,mainnode/.style={font=\sffamily\footnotesize\bfseries},labelnode/.style={font=\footnotesize}]
+%\node at (0,8) [mainnode] [draw] (songid) {Song ID};
+%\draw[step=0.3cm, shift={(2.4,6.0)}] (0,0) grid (0.3,4.2) [labelnode] node[anchor=south] (songvec) {Song vector};
+%\draw[thick,->] (1,8) -- (2,8);
+%
+%\node at (0,2) [mainnode] [draw] (origid) {Origin id};
+%\draw[step=0.3cm, shift={(2.7,0)}] (0,0) grid (0.3,4.2) [labelnode] node[anchor=south] {Mel frequency bins};
+%\draw[thick,->] (1,2) -- (2,2);
+%
+%\draw[thick,->] (4,2) -- (7,2) [labelnode] node[anchor=south east] {Non-linear function};
+%\draw[step=0.3cm, shift={(8.2,0)}] (0,0) grid (0.3,4.2) [labelnode] node[anchor=south] {Origin vector};
+%
+%\node at (0,-4) [mainnode] [draw] (origid) {Compare id};
+%\draw[step=0.3cm, shift={(2.7,-6)}] (0,0) grid (0.3,4.2) [labelnode] node[anchor=south] {Mel frequency bins};
+%\draw[thick,->] (1,-4) -- (2,-4);
+%
+%\draw[thick,->] (4,-4) -- (7,-4) [labelnode] node[anchor=south east] {Non-linear function};
+%\draw[step=0.3cm, shift={(8.2,-6)}] (0,0) grid (0.3,4.2) [labelnode] node[anchor=south] {Compare vector};
+%
+%\draw[thick,-> ] (10,-4) -- (12,-1);
+%\node at (12,-1) [mainnode] [circle,draw] (dotnode) {dot};
+%
+%\path (songvec) [->] edge node {} (dotnode);
+%
+%\node[fit=(songvec), draw] {};
+%\end{tikzpicture}
+
+
+%\begin{tikzpicture}[]
+%
+%\node at (0,2) [rect, draw]   (ti1) {$I_{t1}$};
+%\node at (4,2) [rect, draw]   (tv1) {$V_{t1}$};
+%\node at (0,0) [rect, draw]   (ti2) {$I_{t2}$};
+%\node at (4,0) [rect, draw]   (tv2) {$V_{t2}$};
+%\node at (6,1) [circle, draw]   (dot) {dot};
+%\node at (9,1) [rect, draw]   (approx) {Approximate distance};
+%
+%\path[every node/.style={font=\sffamily\footnotesize}]
+%(ti1) [->] edge node [] {Multi-layer-network 1} (tv1)
+%(ti2) [->] edge node [] {Multi-layer-network 2} (tv2)
+%(tv1) [->] edge node [] {} (dot)
+%(tv2) [->] edge node [] {} (dot)
+%(dot) [->] edge node [] {} (approx);
+%\end{tikzpicture}
 
 
 The neural network is given the task of approximating the following distance function. 
