@@ -8,7 +8,7 @@
 \usepackage{tikz}
 \usetikzlibrary{chains,3d}
 
-\newcommand{\exp}{\text{exp}}
+\newcommand{\Exp}{\text{exp}}
 
 \begin{document}
 	\hfill \textbf{Vector embeddings of time series data with linear properties}
@@ -77,10 +77,10 @@
 	
 	This model is very slow in its original form because of the softmax classification at the end. Recall that the softmax is computed by the following formula
 	
-	$$ \frac{\exp(W_i x)}{\sum_j \exp(W_j x)}$$
+	$$ \frac{\Exp(W_i x)}{\sum_j \Exp(W_j x)}$$
 	In terms of the skip-gram model, $x$ would be the word vector embedding, and $W$ would be the output layer. Unfortunately, the output layer of the skip gram model scales in terms of the vocabulary size, so in order to calculate the denominator of the fraction, the algorithm needs $$(\text{vocab size}) * (\text{embedding size})$$
 	Word2vec eventually solved this problem with negative sampling. The idea is to approximate the denominator by sampling a subset of the output weight vectors, instead of the entire thing. 
-	$$ \frac{\exp(W_i x)}{\sum_{j \in S} \exp(W_j x)}$$
+	$$ \frac{\Exp(W_i x)}{\sum_{j \in S} \Exp(W_j x)}$$
 	$S$ is then chosen randomly from the set of words, but not uniformly: more frequent words are chosen more often than less frequent words. 
 	
 	These manipulations of the generative equation give rise to a completely new interpretation of what is going on:
@@ -93,11 +93,41 @@
 	
 	\section{Dense discriminative embeddings}
 	
+	There has been some past work on discriminative embeddings, rather than predictive embeddings. My work will follow in their footsteps. The most successful version of this is "Look, Learn, Listen" or L$^3$. These models are very powerful in the way that they say what things go where. Unfortunately, attempts to use intra-model learning through spacial reconstructions, etc have fallen far short of supervised learning techniques. \cite{DBLP:journals/corr/NorooziF16} Our goal is to have a better embedding system than them. 
 	
+	It is useful to see how these intra-model embeddings work. All of them try to extract high level information by using high level patterns in images. Some try to extract feature position information such as different parts of an animal by artificially creating and solving a jigsaw puzzle. Others look at frames in a video and try to extract position using match mismatch tuples. Others use gray scale to try to predict color. All of them can be termed as missing information problems. Unfortunately, the information these networks extract to solve the missing information problem never seem to be as useful a the information that supervised networks learn to find labels. 
+	
+	Meanwhile, other techniques, such as unsupervised learning which assumes no specific structure in the input, such as (CITE: ADVERSARIAL FEATURE LEARNING), do even worse. 
+	
+	Instead of hand-engineering a missing information problem, we will train the network to learn the best best possible missing information problem to solve using reinforcement learning, while solving that problem. 
+	
+	Another way of describing this problem is scene exploration, with the goal of finding "surprising elements" in the scene. 
+	
+	%But all them them try to extract high level featuring using high level patterns. 
+	%Our technique is fundamentally different in all of these is that it extracts much lower level features first, and then builds upon them to form high level features. This way, nwe hope that it captures many different aspects of the image relatively well, instead of just capturing enough to solve the contrived high level problem. 
+	
+	
+	
+	\section{Algorithm}
+	
+	The algorithm is a neural network trying to approximate a match/mismatch problem. The match case is two local sound vector, the mismatch case is two vectors sampled uniformly from the entire dataset. 
+	
+	\begin{tikzpicture}[scale=0.6,mainnode/.style={font=\sffamily\footnotesize\bfseries}]
+	\draw [->] (0,0) -- node[pos=-0.2] {time} (5,0);
+	\foreach \tick in {0,1,2,3,4,5,6,7,8,9}
+	\draw [-] (0.5*\tick,0) -- node[pos=-1.5] {\tick} (0.5*\tick,0.3);
+	\draw [-] (1.5,-1) --  (1.5,-1.5);
+	\draw [-] (3.5,-1) --  (3.5,-1.5);
+	\draw [-] (1.5,-1.5) -- node[anchor=north] {Window} (3.5,-1.5);
+	\end{tikzpicture}
+	
+	The mismatch case has the pair of data drawn uniformly from the entire dataset.
+	
+	Song ID vector
 	
 	\section{Results}
 	
-	To test the qualities of these vectors, they were
+	To test the qualities of these vectors, they were \cite{DBLP:journals/corr/abs-1712-06651}
 	
 	
 %	\begin{tikzpicture}[scale=0.6,mainnode/.style={font=\sffamily\footnotesize\bfseries}]
@@ -146,7 +176,7 @@
 	
 	
 	
-	\bibliography{linearlizer_rewite}{}
+	\bibliography{linearlizer_rewrite}{}
 	\bibliographystyle{plain}
 	
 \end{document}
