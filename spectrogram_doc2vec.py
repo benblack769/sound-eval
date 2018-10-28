@@ -134,17 +134,17 @@ def train_all():
             save_music_name_list(SAVE_REPO,music_paths)
             init = tf.global_variables_initializer()
             sess.run(init)
-            linearlizer.load(sess,SAVE_REPO)
+            linearlizer.load(sess,SAVE_REPO+"weights/")
             music_vectors.load_vector_values(sess,result_collection.load_file(epoc_start))
         else:
-            os.makedirs(SAVE_REPO)
+            os.makedirs(SAVE_REPO+"weights/")
             open(SAVE_REPO+"cost_list.csv",'w').write("epoc,cost\n")
             save_music_name_list(SAVE_REPO,music_paths)
             epoc_start = 0
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc_start))
             init = tf.global_variables_initializer()
             sess.run(init)
-            linearlizer.save(sess,SAVE_REPO)
+            linearlizer.save(sess,SAVE_REPO+"weights/")
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc_start)
 
         shutil.copy(config['CONFIG_PATH'],SAVE_REPO+"config.yaml")
@@ -162,7 +162,7 @@ def train_all():
                     print(epoc_loss_sum/(x+1))
             save_string(SAVE_REPO+"epoc_num.txt",str(epoc))
             result_collection.save_file(music_vectors.get_vector_values(sess),epoc)
-            linearlizer.save(sess,SAVE_REPO)
+            linearlizer.save(sess,SAVE_REPO+"weights/")
             open(SAVE_REPO+"cost_list.csv",'a').write("{},{}\n".format(epoc,epoc_loss_sum/(x+1)))
 
 

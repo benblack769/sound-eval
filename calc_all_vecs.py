@@ -13,7 +13,7 @@ def run_spec_list(spec_list,config,model_path):
 
     wordvec = linearlizer.word_vector(vecs)
     with tf.Session() as sess:
-        linearlizer.load(sess, model_path)
+        linearlizer.load(sess, model_path+"weights/")
         for spec in spec_list:
             val = sess.run(wordvec,feed_dict={
                 vecs:spec

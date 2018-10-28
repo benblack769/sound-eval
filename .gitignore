@@ -9,3 +9,5 @@ log
 relu_repo_results
 standard_repo_results
 images
+example_vectors
+example_outs

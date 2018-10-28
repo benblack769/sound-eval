@@ -1,0 +1,21 @@
+# sound evaluation parameters
+SAMPLERATE: 16000
+TIME_SEGMENT_SIZE: 0.1
+WINDOW_SIZE: 4
+
+# output parameters
+TRAIN_STEPS_PER_SAVE: 20000000
+TRAIN_STEPS_PER_PRINT: 100000
+NUM_REFERENCE_VECS: 4000
+
+# model parameters
+NUM_MEL_BINS: 80
+HIDDEN_SIZE: 128
+OUTPUT_VECTOR_SIZE: 32
+
+# traning parameters
+BATCH_SIZE: 120
+ADAM_learning_rate: 0.001
+
+# hardware parameters
+USE_GPU: False
