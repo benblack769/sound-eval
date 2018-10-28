@@ -65,4 +65,7 @@ Examples of these are listed below:
 The FMA dataset is https://github.com/mdeff/fma
 
 
-View output
+![View output](design_diagrams/example_results/viewer_screenshot.PNG)
+
+
+![k-means chart](design_diagrams/example_results/fma_plot8.png)
