@@ -1,6 +1,6 @@
 # sound-eval
 
-This repository contains command line tools to process audio files (in mp3 or wav formats) into vector embeddings.
+This repository contains command line tools to process audio files (in mp3 or wav formats) into vector embeddings, and some tools to make use of those embeddings.
 
 
 ### Installing
@@ -52,20 +52,44 @@ The output folder has a lot of files. You mostly need to know about the first tw
 
 The resulting vectors can be used for many tasks. There are several options for processing the output vectors already implemented.
 
-* Constructing an interactive display for the sound file embeddings. `static_web_viewer\display_vector_data.py`
-* Using supervised SVMs to classify the songs based on their vector, and a labeled training dataset: `process_results\logistic_regress.py`
-* Automatically create categories of sound with spherical k-means, and compare those categories to labeled categories. `process_results\sphere_kmeans.py`
+* Constructing an interactive display for the sound file embeddings. `static_web_viewer/display_vector_data.py`
+* Using supervised SVMs to classify the songs based on their vector, and a labeled training dataset: `process_results/logistic_regress.py`
+* Automatically create categories of sound with spherical k-means, and compare those categories to labeled categories. `process_results/sphere_kmeans.py`
 
 Examples of these are listed below:
 
-### API details
-
 ## Successful Examples on the FMA dataset
 
-The FMA dataset is https://github.com/mdeff/fma
+The FMA dataset is a dataset composed of songs posted with liberal licenses on the [Free Music Archive website](http://freemusicarchive.org/). Link to dataset: https://github.com/mdeff/fma
 
+The following results are on the smallest dataset provided, fma_small.zip, composed of 8000 30s song clips taken from 8 genres.
+
+### t-SNE visualization
+
+After training, I fed the resulting song vectors into my `static_web_viewer/display_vector_data.py` tool, which gives the following output
+
+[Link to interactive display](https://s3-us-west-2.amazonaws.com/fma-dataset-embeddings/display_template.html)
+
+This display is produced using a t-SNE embedding with a cosine distance matrix.  
+
+There are two interesting features of this display. One is that you can see general clusters of genres that emerge from the t-SNE pprojection. You can play individual songs to see what the difference is between borders of these clusters vs the center.
 
 ![View output](design_diagrams/example_results/viewer_screenshot.PNG)
 
+Since the t-SNE projection removes the vast majority of the distance information, I added an additional feature that brings back all the distance information.
+
+If you change the "Color points by" option to "distance_to_selected" (circled below), the points will be colored by distance to the selected point. In this screenshot, the point with an orange circle (added for effect) was clicked on.
+
+![View output](design_diagrams/example_results/distance_viewer_screenshot_edited.PNG)
+
+This shows that close points are spread across the display, allowing you to compare more carefully different areas of the map by hand.
+
+### Spherical k-Means classification
+
+One standard thing to do with embeddings is to run k-means to cluster them, and examine the clusters to see if they make sense to humans. In the given bar plot, the x axis shows the contents of 8 different clusters formed by a k-means.
 
 ![k-means chart](design_diagrams/example_results/fma_plot8.png)
+
+This plot shows some promising results. For example, some genres, such as hip-hop, rock, and electronic are concentrated mostly in one or two clusters. The genres which are more spread out, like experimental, pop, and international, are by their nature more difficult  genres to classify.  You can try it yourself, by clicking on songs in the interface, and trying to classify them into these 8 genres, and seeing if you guess is right.
+
+Even more promising is looking at which genres overlap significantly. Note that the clusters with the two largest concentrations of Folk have the smallest concentrations of Electronic. This confirms the intuition that Electronic and Folk music are difficult to confuse.
