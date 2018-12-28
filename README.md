@@ -1,6 +1,49 @@
 # sound-eval
 
-This repository contains command line tools to process audio files (in mp3 or wav formats) into vector embeddings, and some tools to make use of those embeddings.
+This repository contains command line tools to process audio files (in mp3 or wav formats) into vector embeddings, and some tools to make use of those embeddings. Its most significant result right now is an interactive distance display deployed [here](https://s3-us-west-2.amazonaws.com/fma-dataset-embeddings/display_template.html), and described in more detail in the examples section of this readme.
+
+### Model
+
+This model is inspired by Thomas Miktov's work on word-to-vec and doc-to-vec. These two natural language processing models, distributed through popular distributions like gensim, are still quite popular today, especially among a more applied research community. This is despite these methods being crushed on basically every relevant benchmark they have been applied to in 2017 and 2018.
+
+The reason they remain popular, despite their low performance on benchmarks is:
+
+* Incredible training speed on large datasets (still far exceeding competitors)
+* The ability to use embedding vectors easily and effectively in old, well understood, and extremely accessible methods such as k-means, t-SNE, and logistic regression.
+* The linear algebraic relations among words such as the famous `King - man + woman = Queen` relation.
+
+I hope to bring these properties to the audio processing world to make audio processing as easy, fast and well understood as natural language processing using word-to-vec and doc-to-vec.
+
+#### Relevant literature
+
+Audio processing has lately been tied closely to computer vision.
+So closely in fact, that one significant paper sponsored by Google, "CNN Architectures for Large-Scale Audio Classification", applies several state of the art image classification architectures, and apply them (with minor tweaks) directly to audio classification (the two dimensions in audio processing are time and spectrogram bin).
+
+So it should not be surprising that someone already had an idea very close to mine in the computer vision world. It is called "Learning visual groups from co-occurrences in space and time", and its bibtex citation is at the bottom of this section.
+
+This paper proposes a number of techniques using their method which also apply to my model, and they do a more through literature review and explanation than I cover here, and in general it is vastly superior research, so I suggest checking it out.
+
+    @article{DBLP:journals/corr/IsolaZKA15,
+      author    = {Phillip Isola and
+                   Daniel Zoran and
+                   Dilip Krishnan and
+                   Edward H. Adelson},
+      title     = {Learning visual groups from co-occurrences in space and time},
+      journal   = {CoRR},
+      volume    = {abs/1511.06811},
+      year      = {2015},
+      url       = {http://arxiv.org/abs/1511.06811},
+      archivePrefix = {arXiv},
+      eprint    = {1511.06811},
+      timestamp = {Mon, 13 Aug 2018 16:48:47 +0200},
+      biburl    = {https://dblp.org/rec/bib/journals/corr/IsolaZKA15},
+      bibsource = {dblp computer science bibliography, https://dblp.org}
+    }
+
+#### Cost function
+
+The secret behind the good properties of the embedding is in the cost function. By comparison, the other parts of the model are relatively unimportant.
+
 
 
 ### Installing
@@ -50,7 +93,7 @@ The output folder has a lot of files. You mostly need to know about the first tw
 
 ### Postprocessing
 
-The resulting vectors can be used for many tasks. There are several options for processing the output vectors already implemented.
+The resulting vectors can be used for many tasks. There are several options for processing the output vectors already implemented in the repository.
 
 * Constructing an interactive display for the sound file embeddings. `static_web_viewer/display_vector_data.py`
 * Using supervised SVMs to classify the songs based on their vector, and a labeled training dataset: `process_results/logistic_regress.py`
