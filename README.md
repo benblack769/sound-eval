@@ -21,7 +21,7 @@ So closely in fact, that one significant paper sponsored by Google, "CNN Archite
 
 So it should not be surprising that someone already had an idea very close to mine in the computer vision world. It is called "Learning visual groups from co-occurrences in space and time", and its bibtex citation is at the bottom of this section.
 
-This paper proposes a number of techniques using their method which also apply to my model, and they do a more through literature review and explanation than I cover here, and in general it is vastly superior research, so I suggest checking it out.
+This paper proposes a number of techniques using their method which also apply to my model, and they do a more through literature review,  deeper explanation of their technique, and larger list of possible applications than I cover here, and in general it is vastly superior research, so I suggest checking it out.
 
     @article{DBLP:journals/corr/IsolaZKA15,
       author    = {Phillip Isola and
@@ -40,11 +40,27 @@ This paper proposes a number of techniques using their method which also apply t
       bibsource = {dblp computer science bibliography, https://dblp.org}
     }
 
-#### Cost function
 
-The secret behind the good properties of the embedding is in the cost function. By comparison, the other parts of the model are relatively unimportant.
+#### Context dependence problem.
 
+To get an embedding, we need some unsupervised problem to train it on. The basic problem selected by me and word-to-vec is the context dependence problem.
 
+The context dependence problem is the problem of whether two different segments of data appear in the same local context. The key here is that a piece of information (in this case a sound spectrum) informs something about nearby (in this case temporally nearby) pieces of information.
+
+More mathematically, we can describe two sets of data:
+
+* Global context set: All pairs of data, `( A, B )`
+* Local context set: All pairs of data, `( A, B )` such that `A` and `B` are nearby (in this case within a certain temporal distance from each other).
+
+The idea is that these sets are different, and that a neural network can often tell which sets a given element is from by looking at the values of the data.
+
+#### Embedding
+
+Note that the Context dependence problem is a binary decision problem. Either a pair of data is in the global context set or the local context set.
+
+A traditional binary classification network, although it can get extremely good performance on the training task, and the resulting embeddings often contain very useful information and have useful properties, the embeddings do not have all of the good properties that make word-to-vec so useful.
+
+Instead, 
 
 ### Installing
 
