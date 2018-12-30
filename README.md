@@ -58,9 +58,22 @@ The idea is that these sets are different, and that a neural network can often t
 
 Note that the Context dependence problem is a binary decision problem. Either a pair of data is in the global context set or the local context set.
 
-A traditional binary classification network, although it can get extremely good performance on the training task, and the resulting embeddings often contain very useful information and have useful properties, the embeddings do not have all of the good properties that make word-to-vec so useful.
+A traditional binary classification network, although it can get extremely good performance on the training task, and the resulting embeddings sometimes contain useful information and have useful properties, the embeddings do not have all of the good properties that make word-to-vec so useful.
 
-Instead, 
+Instead, we intentionally cripple the architecture to force the features to appear in a neatly analytical nature. There are two key aspects to the architecture.
+
+1. Information separation. Although the training task is on pairs of data, the actual output should be an embedding of a single piece of data. Since the embedding will just be a layer in the neural network, then the information of the pairs must be kept separate until the layer the embedding is taken from.
+2. Embedding value independence. In order to have the linear property, and have a reasonable distance metric that k-means and t-SNE can work with out of box, each scalar value in the embedding vector have a certain kind of independence from the others values. Not independent of inputs, but independence of outputs, i.e., the training cost should depend on each element independently.
+
+These two needs, plus a more technical investigation into word-to-vec, results in a binary classification probability.
+
+`P((A,B) from global context) = sigoid(embedding_1 * embedding_2)`
+
+The dot product is exactly the sort of linear, independent, but powerful operation we are looking for and sigmoid is great for binary classification.
+
+#### Distributed embedding
+
+Taking a page from Thomas Miktov's word-to-vec, 
 
 ### Installing
 
