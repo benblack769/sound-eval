@@ -137,6 +137,11 @@ This paper proposes a number of techniques using their method which also apply t
     }
 
 
+## Model
+
+![](design_diagrams/doc2vec.svg)
+
+
 ### Context dependence problem.
 
 To get an embedding, we need some unsupervised problem to train it on. The basic problem selected by me and word-to-vec is the context dependence problem.
